@@ -82,6 +82,24 @@ export const levels: LevelConfig[] = [
   { id: 30, rows: 12, cols: 12, targetVariant: 'white-tail-tip', targetPrompt: '最后一关：找出尾巴尖是白色的猫', timeLimitSec: 12, wrongPenaltySec: 2, decoyVariants: ['straight-tail', 'short-tail'], decoyRatio: 0.18 }
 ];
 
+function validateLevels(configs: LevelConfig[]): void {
+  const targetVariants = new Set<CatVariant>();
+  const prompts = new Set<string>();
+
+  for (const level of configs) {
+    if (targetVariants.has(level.targetVariant)) {
+      throw new Error(`Duplicate target variant in levels: ${level.targetVariant}`);
+    }
+    if (prompts.has(level.targetPrompt)) {
+      throw new Error(`Duplicate target prompt in levels: ${level.targetPrompt}`);
+    }
+    targetVariants.add(level.targetVariant);
+    prompts.add(level.targetPrompt);
+  }
+}
+
+validateLevels(levels);
+
 export function getLevel(id: number): LevelConfig {
   return levels[Math.max(0, Math.min(levels.length - 1, id - 1))];
 }
