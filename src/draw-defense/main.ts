@@ -3,35 +3,35 @@ import './style.css';
 type Point = { x: number; y: number };
 type UnitType = 'mage' | 'archer' | 'warrior';
 type EnemyKind = 'grunt' | 'runner' | 'tank' | 'boss';
+type Side = 'player' | 'enemy';
 
-type Unit = {
-  type: UnitType;
-  spotIndex: number;
-  level: number;
-  cooldown: number;
-};
-
-type Enemy = {
+type Fighter = {
   id: number;
-  kind: EnemyKind;
+  side: Side;
+  type?: UnitType;
+  kind?: EnemyKind;
+  x: number;
+  y: number;
   hp: number;
   maxHp: number;
   speed: number;
-  reward: number;
-  distance: number;
-  slowUntil: number;
+  range: number;
+  damage: number;
+  rate: number;
+  cooldown: number;
+  splash: number;
+  size: number;
   dead: boolean;
 };
 
-type SpawnItem = { at: number; kind: EnemyKind };
-
 type Effect = {
-  kind: 'line' | 'blast' | 'slash';
+  kind: 'shot' | 'blast' | 'slash' | 'base-hit';
   from: Point;
   to: Point;
   radius: number;
   life: number;
   maxLife: number;
+  side: Side;
 };
 
 const app = document.querySelector<HTMLDivElement>('#draw-defense-app');
@@ -40,60 +40,61 @@ if (!app) throw new Error('Missing #draw-defense-app');
 app.innerHTML = `
   <main class="dd-shell">
     <header class="dd-topbar">
-      <div class="dd-title-wrap">
-        <h1>画个守卫</h1>
-        <p>Draw Defense · V0.1 Prototype</p>
+      <div>
+        <p class="dd-eyebrow">DRAW DEFENSE · V0.2</p>
+        <h1>画兵推线</h1>
       </div>
-      <a class="dd-back" href="./">← 找猫</a>
+      <div class="dd-header-actions">
+        <span id="battleStatus">准备阶段</span>
+        <button class="dd-btn dd-btn-primary" id="startBattle">开始战斗</button>
+        <button class="dd-btn" id="restartBattle">重开</button>
+      </div>
     </header>
 
-    <section class="dd-stats">
-      <div class="dd-stat"><span>Wave</span><strong id="waveStat">0 / 5</strong></div>
-      <div class="dd-stat"><span>Castle</span><strong id="lifeStat">❤️ 10</strong></div>
-      <div class="dd-stat"><span>Gold</span><strong id="goldStat">💰 240</strong></div>
+    <section class="dd-hud">
+      <div class="dd-hud-side player"><span>我方基地</span><strong id="playerHp">1000</strong></div>
+      <div class="dd-hud-center">
+        <div><span>Wave</span><strong id="waveStat">0 / 5</strong></div>
+        <div><span>墨水</span><strong id="inkStat">80 / 120</strong></div>
+        <div><span>金币</span><strong id="goldStat">0</strong></div>
+      </div>
+      <div class="dd-hud-side enemy"><span>敌方基地</span><strong id="enemyHp">1000</strong></div>
     </section>
 
     <section class="dd-battle-card">
-      <canvas id="battlefield" width="390" height="500" aria-label="塔防战场"></canvas>
+      <canvas id="battlefield" width="960" height="420" aria-label="横版推线战场"></canvas>
       <div class="dd-toast" id="toast"></div>
+      <div class="dd-rotate-note">横屏体验更好 ↻</div>
     </section>
 
-    <section class="dd-controls">
-      <div class="dd-wave-row">
-        <div class="dd-status" id="statusText">先画一个形状召唤守卫，也可以直接开始第一波。</div>
-        <button class="dd-btn dd-btn-primary" id="waveButton">开始 Wave 1</button>
-      </div>
-
+    <section class="dd-bottom-grid">
       <section class="dd-draw-card">
-        <div class="dd-draw-head">
+        <div class="dd-section-head">
           <div>
-            <strong>手画召唤</strong>
-            <p>闭合画完后自动识别，再点战场上的空建造点。</p>
+            <strong>画一个兵种，立刻从左边出兵</strong>
+            <p>○ 法师 · △ 弓箭手 · □ 战士</p>
           </div>
-          <div class="dd-recognition" id="recognitionText">等待绘制</div>
+          <div id="recognitionText" class="dd-recognition">等待绘制</div>
         </div>
-
         <div class="dd-pad-wrap">
-          <canvas id="drawPad" width="460" height="150" aria-label="手画识别区域"></canvas>
+          <canvas id="drawPad" width="430" height="130" aria-label="手画召唤区域"></canvas>
           <div class="dd-pad-hint" id="padHint"><span>○</span><span>△</span><span>□</span></div>
         </div>
+        <div class="dd-resource-note">墨水自动回复，击杀也会返还墨水。画一次会直接暴一小队兵。</div>
+      </section>
 
-        <div class="dd-legend">
-          <div class="dd-class"><strong>○ 法师 · 110</strong><span>慢速范围群伤</span></div>
-          <div class="dd-class"><strong>△ 弓箭手 · 90</strong><span>高速远程单体</span></div>
-          <div class="dd-class"><strong>□ 战士 · 70</strong><span>近战重击减速</span></div>
+      <section class="dd-army-card">
+        <div class="dd-section-head">
+          <div>
+            <strong>兵种升级</strong>
+            <p>升级后，新出的同类单位永久变强</p>
+          </div>
         </div>
-
-        <div class="dd-actions">
-          <button class="dd-btn" id="clearDraw">清除绘制</button>
-          <button class="dd-btn dd-btn-danger" id="cancelSummon">取消召唤</button>
-        </div>
-
-        <section class="dd-unit-panel" id="unitPanel"></section>
+        <div class="dd-upgrades" id="upgradePanel"></div>
       </section>
     </section>
 
-    <p class="dd-help">玩法原型：画 ○ / △ / □ → 选位置 → 自动战斗 → 点击已放单位升级。第 5 波有 Boss。</p>
+    <p class="dd-help">目标：把战线从左向右推过去，打爆敌方基地。战士顶线，弓箭手远程持续输出，法师负责清群怪。</p>
   </main>
 `;
 
@@ -109,597 +110,564 @@ function mustElement<T extends HTMLElement>(id: string): T {
   return node;
 }
 
+function mustContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('2D canvas unavailable');
+  return context;
+}
+
 const battleCanvas = mustCanvas('battlefield');
-const battleCtx = battleCanvas.getContext('2d');
-if (!battleCtx) throw new Error('2D canvas unavailable');
-
+const ctx = mustContext(battleCanvas);
 const drawCanvas = mustCanvas('drawPad');
-const drawCtx = drawCanvas.getContext('2d');
-if (!drawCtx) throw new Error('2D canvas unavailable');
+const drawCtx = mustContext(drawCanvas);
 
+const playerHpEl = mustElement<HTMLElement>('playerHp');
+const enemyHpEl = mustElement<HTMLElement>('enemyHp');
 const waveStat = mustElement<HTMLElement>('waveStat');
-const lifeStat = mustElement<HTMLElement>('lifeStat');
+const inkStat = mustElement<HTMLElement>('inkStat');
 const goldStat = mustElement<HTMLElement>('goldStat');
-const statusText = mustElement<HTMLElement>('statusText');
-const waveButton = mustElement<HTMLButtonElement>('waveButton');
+const battleStatus = mustElement<HTMLElement>('battleStatus');
 const recognitionText = mustElement<HTMLElement>('recognitionText');
-const unitPanel = mustElement<HTMLElement>('unitPanel');
 const padHint = mustElement<HTMLElement>('padHint');
+const upgradePanel = mustElement<HTMLElement>('upgradePanel');
 const toast = mustElement<HTMLElement>('toast');
+const startBattle = mustElement<HTMLButtonElement>('startBattle');
+const restartBattle = mustElement<HTMLButtonElement>('restartBattle');
 
 const WIDTH = battleCanvas.width;
 const HEIGHT = battleCanvas.height;
+const GROUND_Y = 322;
+const PLAYER_BASE_X = 62;
+const ENEMY_BASE_X = WIDTH - 62;
+const MAX_BASE_HP = 1000;
+const MAX_INK = 120;
 const TOTAL_WAVES = 5;
 
-const PATH: Point[] = [
-  { x: -24, y: 82 },
-  { x: 132, y: 82 },
-  { x: 132, y: 198 },
-  { x: 300, y: 198 },
-  { x: 300, y: 346 },
-  { x: 414, y: 346 }
-];
-
-const BUILD_SPOTS: Point[] = [
-  { x: 72, y: 142 },
-  { x: 72, y: 37 },
-  { x: 185, y: 134 },
-  { x: 188, y: 250 },
-  { x: 250, y: 144 },
-  { x: 350, y: 145 },
-  { x: 248, y: 302 },
-  { x: 344, y: 286 },
-  { x: 242, y: 405 }
-];
-
-const UNIT_META: Record<UnitType, { name: string; symbol: string; cost: number }> = {
-  mage: { name: '法师', symbol: '○', cost: 110 },
-  archer: { name: '弓箭手', symbol: '△', cost: 90 },
-  warrior: { name: '战士', symbol: '□', cost: 70 }
+const UNIT_META: Record<UnitType, {
+  name: string;
+  symbol: string;
+  cost: number;
+  squad: number;
+  hp: number;
+  speed: number;
+  range: number;
+  damage: number;
+  rate: number;
+  splash: number;
+}> = {
+  warrior: { name: '战士', symbol: '□', cost: 24, squad: 3, hp: 150, speed: 43, range: 30, damage: 22, rate: 0.72, splash: 0 },
+  archer: { name: '弓箭手', symbol: '△', cost: 30, squad: 2, hp: 78, speed: 38, range: 150, damage: 14, rate: 0.62, splash: 0 },
+  mage: { name: '法师', symbol: '○', cost: 40, squad: 1, hp: 92, speed: 34, range: 128, damage: 32, rate: 1.18, splash: 58 }
 };
 
-const pathSegments = PATH.slice(0, -1).map((point, index) => {
-  const next = PATH[index + 1];
-  const length = Math.hypot(next.x - point.x, next.y - point.y);
-  return { from: point, to: next, length };
-});
-const pathLength = pathSegments.reduce((sum, segment) => sum + segment.length, 0);
+const levels: Record<UnitType, number> = { warrior: 1, archer: 1, mage: 1 };
 
-let gold = 240;
-let castleLife = 10;
-let currentWave = 0;
-let waveRunning = false;
-let gameOver = false;
-let gameTime = 0;
-let waveTime = 0;
-let spawnPlan: SpawnItem[] = [];
-let spawnIndex = 0;
-let enemyId = 1;
-let selectedSummon: UnitType | null = null;
-let selectedUnitSpot: number | null = null;
-let units: Unit[] = [];
-let enemies: Enemy[] = [];
+let fighters: Fighter[] = [];
 let effects: Effect[] = [];
+let nextId = 1;
+let playerBaseHp = MAX_BASE_HP;
+let enemyBaseHp = MAX_BASE_HP;
+let ink = 80;
+let gold = 0;
+let gameTime = 0;
+let battleStarted = false;
+let gameOver = false;
+let currentWave = 0;
+let nextSpawnAt = 0;
+let bossSpawned = false;
 let toastTimer: number | null = null;
 
-function wavePlan(wave: number): SpawnItem[] {
-  const plan: SpawnItem[] = [];
-  const add = (count: number, kind: EnemyKind, interval: number, start: number): number => {
-    for (let i = 0; i < count; i += 1) plan.push({ at: start + i * interval, kind });
-    return start + count * interval;
+function playerStats(type: UnitType): Omit<Fighter, 'id' | 'side' | 'type' | 'x' | 'y' | 'cooldown' | 'dead'> {
+  const meta = UNIT_META[type];
+  const level = levels[type];
+  const scale = 1 + (level - 1) * 0.34;
+  return {
+    hp: meta.hp * scale,
+    maxHp: meta.hp * scale,
+    speed: meta.speed * (1 + (level - 1) * 0.05),
+    range: meta.range + (level - 1) * (type === 'warrior' ? 2 : 8),
+    damage: meta.damage * scale,
+    rate: Math.max(0.34, meta.rate - (level - 1) * 0.06),
+    splash: meta.splash + (level - 1) * 9,
+    size: type === 'warrior' ? 16 : 14
   };
-
-  if (wave === 1) add(8, 'grunt', 0.78, 0);
-  if (wave === 2) {
-    let t = add(7, 'grunt', 0.7, 0);
-    add(5, 'runner', 0.55, t + 0.4);
-  }
-  if (wave === 3) {
-    let t = add(6, 'grunt', 0.62, 0);
-    t = add(4, 'tank', 1.05, t + 0.3);
-    add(5, 'grunt', 0.55, t + 0.2);
-  }
-  if (wave === 4) {
-    let t = add(7, 'runner', 0.46, 0);
-    t = add(6, 'grunt', 0.52, t + 0.2);
-    add(4, 'tank', 0.92, t + 0.2);
-  }
-  if (wave === 5) {
-    let t = add(6, 'grunt', 0.52, 0);
-    t = add(5, 'runner', 0.45, t + 0.2);
-    t = add(3, 'tank', 0.85, t + 0.25);
-    plan.push({ at: t + 0.8, kind: 'boss' });
-  }
-
-  return plan.sort((a, b) => a.at - b.at);
 }
 
-function enemyStats(kind: EnemyKind): Omit<Enemy, 'id' | 'distance' | 'slowUntil' | 'dead'> {
-  const waveScale = 1 + Math.max(0, currentWave - 1) * 0.12;
-  if (kind === 'runner') return { kind, hp: 34 * waveScale, maxHp: 34 * waveScale, speed: 71, reward: 13 };
-  if (kind === 'tank') return { kind, hp: 126 * waveScale, maxHp: 126 * waveScale, speed: 29, reward: 28 };
-  if (kind === 'boss') return { kind, hp: 520, maxHp: 520, speed: 23, reward: 140 };
-  return { kind, hp: 58 * waveScale, maxHp: 58 * waveScale, speed: 43, reward: 16 };
+function enemyStats(kind: EnemyKind): Omit<Fighter, 'id' | 'side' | 'kind' | 'x' | 'y' | 'cooldown' | 'dead'> {
+  const waveScale = 1 + Math.max(0, currentWave - 1) * 0.16;
+  if (kind === 'runner') {
+    return { hp: 62 * waveScale, maxHp: 62 * waveScale, speed: 58, range: 26, damage: 12 * waveScale, rate: 0.72, splash: 0, size: 13 };
+  }
+  if (kind === 'tank') {
+    return { hp: 230 * waveScale, maxHp: 230 * waveScale, speed: 22, range: 30, damage: 24 * waveScale, rate: 0.9, splash: 0, size: 19 };
+  }
+  if (kind === 'boss') {
+    return { hp: 820, maxHp: 820, speed: 18, range: 40, damage: 42, rate: 0.88, splash: 0, size: 27 };
+  }
+  return { hp: 92 * waveScale, maxHp: 92 * waveScale, speed: 35, range: 28, damage: 15 * waveScale, rate: 0.78, splash: 0, size: 15 };
+}
+
+function laneY(index: number, side: Side): number {
+  const offsets = [-18, 0, 18, -9, 9];
+  const jitter = offsets[index % offsets.length];
+  return GROUND_Y + jitter + (side === 'player' ? 0 : 2);
+}
+
+function summon(type: UnitType): void {
+  if (gameOver) return;
+  const meta = UNIT_META[type];
+  if (ink < meta.cost) {
+    showToast(`墨水不够：${meta.name}需要 ${meta.cost}`, 'bad');
+    recognitionText.textContent = '墨水不足';
+    return;
+  }
+
+  ink -= meta.cost;
+  for (let i = 0; i < meta.squad; i += 1) {
+    const stats = playerStats(type);
+    fighters.push({
+      id: nextId++,
+      side: 'player',
+      type,
+      x: PLAYER_BASE_X + 34 - i * 9,
+      y: laneY(i + nextId, 'player'),
+      ...stats,
+      cooldown: Math.random() * 0.3,
+      dead: false
+    });
+  }
+  showToast(`${meta.symbol} ${meta.name} ×${meta.squad} 出击`, 'good');
+  updateHud();
 }
 
 function spawnEnemy(kind: EnemyKind): void {
-  const base = enemyStats(kind);
-  enemies.push({
-    id: enemyId++,
-    ...base,
-    distance: 0,
-    slowUntil: 0,
+  const stats = enemyStats(kind);
+  fighters.push({
+    id: nextId++,
+    side: 'enemy',
+    kind,
+    x: ENEMY_BASE_X - 36,
+    y: laneY(nextId, 'enemy'),
+    ...stats,
+    cooldown: Math.random() * 0.35,
     dead: false
   });
 }
 
-function startWave(): void {
-  if (gameOver || waveRunning || currentWave >= TOTAL_WAVES) return;
-  currentWave += 1;
-  waveRunning = true;
-  waveTime = 0;
-  spawnIndex = 0;
-  spawnPlan = wavePlan(currentWave);
-  selectedUnitSpot = null;
-  renderUnitPanel();
-  setStatus(currentWave === TOTAL_WAVES ? 'Boss 波开始。最后一波守住就赢！' : `Wave ${currentWave} 开始，注意敌人路线。`);
-  updateUi();
+function chooseEnemyKind(wave: number): EnemyKind {
+  const roll = Math.random();
+  if (wave === 1) return roll < 0.78 ? 'grunt' : 'runner';
+  if (wave === 2) return roll < 0.5 ? 'grunt' : roll < 0.82 ? 'runner' : 'tank';
+  if (wave === 3) return roll < 0.42 ? 'grunt' : roll < 0.68 ? 'runner' : 'tank';
+  if (wave === 4) return roll < 0.34 ? 'grunt' : roll < 0.62 ? 'runner' : 'tank';
+  return roll < 0.25 ? 'grunt' : roll < 0.5 ? 'runner' : 'tank';
 }
 
-function finishWave(): void {
-  waveRunning = false;
-  if (currentWave >= TOTAL_WAVES) {
-    showEnd(true);
+function spawnLogic(): void {
+  if (!battleStarted || gameOver) return;
+  currentWave = Math.min(TOTAL_WAVES, Math.floor(gameTime / 18) + 1);
+  const intervals = [2.25, 1.8, 1.5, 1.22, 1.0];
+  if (gameTime >= nextSpawnAt) {
+    spawnEnemy(chooseEnemyKind(currentWave));
+    nextSpawnAt = gameTime + intervals[currentWave - 1];
+  }
+
+  if (currentWave === 5 && !bossSpawned && gameTime >= 76) {
+    bossSpawned = true;
+    spawnEnemy('boss');
+    showToast('BOSS 从右侧压过来了！', 'bad');
+  }
+}
+
+function findTarget(unit: Fighter): Fighter | null {
+  const enemies = fighters.filter((candidate) => !candidate.dead && candidate.side !== unit.side);
+  if (enemies.length === 0) return null;
+
+  const directional = enemies.filter((candidate) => unit.side === 'player' ? candidate.x >= unit.x - 12 : candidate.x <= unit.x + 12);
+  const pool = directional.length > 0 ? directional : enemies;
+  pool.sort((a, b) => Math.abs(a.x - unit.x) - Math.abs(b.x - unit.x));
+  return pool[0] ?? null;
+}
+
+function applyDamage(target: Fighter, damage: number, attacker: Fighter): void {
+  if (target.dead) return;
+  target.hp -= damage;
+  if (target.hp > 0) return;
+
+  target.dead = true;
+  if (attacker.side === 'player') {
+    const reward = target.kind === 'boss' ? 120 : target.kind === 'tank' ? 18 : target.kind === 'runner' ? 10 : 12;
+    gold += reward;
+    ink = Math.min(MAX_INK, ink + (target.kind === 'boss' ? 18 : 4));
+  }
+}
+
+function attackFighter(attacker: Fighter, target: Fighter): void {
+  attacker.cooldown = attacker.rate;
+  const from = { x: attacker.x, y: attacker.y - 20 };
+  const to = { x: target.x, y: target.y - 20 };
+
+  if (attacker.side === 'player' && attacker.type === 'mage') {
+    for (const candidate of fighters) {
+      if (candidate.dead || candidate.side === attacker.side) continue;
+      if (Math.abs(candidate.x - target.x) <= attacker.splash) {
+        applyDamage(candidate, attacker.damage, attacker);
+      }
+    }
+    effects.push({ kind: 'blast', from, to, radius: attacker.splash, life: 0.28, maxLife: 0.28, side: attacker.side });
     return;
   }
-  const bonus = 35 + currentWave * 10;
-  gold += bonus;
-  showToast(`Wave ${currentWave} 守住了！奖励 ${bonus} 金币`, 'good');
-  setStatus(`波次完成。现在可以补守卫或升级，再开始 Wave ${currentWave + 1}。`);
-  updateUi();
+
+  applyDamage(target, attacker.damage, attacker);
+  effects.push({
+    kind: attacker.range > 60 ? 'shot' : 'slash',
+    from,
+    to,
+    radius: 0,
+    life: attacker.range > 60 ? 0.16 : 0.12,
+    maxLife: attacker.range > 60 ? 0.16 : 0.12,
+    side: attacker.side
+  });
+}
+
+function attackBase(unit: Fighter): void {
+  unit.cooldown = unit.rate;
+  const attackingEnemy = unit.side === 'player';
+  if (attackingEnemy) {
+    enemyBaseHp = Math.max(0, enemyBaseHp - unit.damage);
+  } else {
+    playerBaseHp = Math.max(0, playerBaseHp - unit.damage);
+  }
+
+  effects.push({
+    kind: 'base-hit',
+    from: { x: unit.x, y: unit.y - 18 },
+    to: { x: attackingEnemy ? ENEMY_BASE_X : PLAYER_BASE_X, y: GROUND_Y - 38 },
+    radius: 22,
+    life: 0.2,
+    maxLife: 0.2,
+    side: unit.side
+  });
+
+  if (enemyBaseHp <= 0) endGame(true);
+  if (playerBaseHp <= 0) endGame(false);
+}
+
+function updateFighters(dt: number): void {
+  for (const unit of fighters) {
+    if (unit.dead) continue;
+    unit.cooldown = Math.max(0, unit.cooldown - dt);
+    const target = findTarget(unit);
+    const targetDistance = target ? Math.abs(target.x - unit.x) : Infinity;
+
+    if (target && targetDistance <= unit.range + target.size * 0.6) {
+      if (unit.cooldown <= 0) attackFighter(unit, target);
+      continue;
+    }
+
+    const baseDistance = unit.side === 'player'
+      ? ENEMY_BASE_X - unit.x
+      : unit.x - PLAYER_BASE_X;
+
+    if (baseDistance <= unit.range + 28) {
+      if (unit.cooldown <= 0) attackBase(unit);
+      continue;
+    }
+
+    const direction = unit.side === 'player' ? 1 : -1;
+    unit.x += direction * unit.speed * dt;
+  }
+
+  fighters = fighters.filter((fighter) => !fighter.dead && fighter.x > 10 && fighter.x < WIDTH - 10);
+}
+
+function endGame(win: boolean): void {
+  if (gameOver) return;
+  gameOver = true;
+  battleStarted = false;
+  battleStatus.textContent = win ? '胜利' : '失败';
+  showToast(win ? '敌方基地被推平了！' : '我方基地失守', win ? 'good' : 'bad');
+
+  const modal = document.createElement('div');
+  modal.className = 'dd-modal';
+  modal.innerHTML = `
+    <section class="dd-modal-card">
+      <div class="big">${win ? '⚔️' : '💥'}</div>
+      <h2>${win ? '推进成功' : '防线崩溃'}</h2>
+      <p>${win ? '你的部队一路从左侧推到了敌方基地。' : '调整暴兵节奏和升级顺序，再打一局。'}</p>
+      <button class="dd-btn dd-btn-primary" data-restart>再来一局</button>
+    </section>
+  `;
+  document.body.append(modal);
+  modal.querySelector('[data-restart]')?.addEventListener('click', () => {
+    modal.remove();
+    resetGame();
+  });
 }
 
 function update(dt: number): void {
-  if (gameOver) return;
-  gameTime += dt;
-
-  if (waveRunning) {
-    waveTime += dt;
-    while (spawnIndex < spawnPlan.length && spawnPlan[spawnIndex].at <= waveTime) {
-      spawnEnemy(spawnPlan[spawnIndex].kind);
-      spawnIndex += 1;
+  if (!gameOver) {
+    ink = Math.min(MAX_INK, ink + dt * 7.2);
+    if (battleStarted) {
+      gameTime += dt;
+      spawnLogic();
+      updateFighters(dt);
     }
-  }
-
-  for (const enemy of enemies) {
-    if (enemy.dead) continue;
-    const speedFactor = enemy.slowUntil > gameTime ? 0.48 : 1;
-    enemy.distance += enemy.speed * speedFactor * dt;
-    if (enemy.distance >= pathLength) {
-      enemy.dead = true;
-      const damage = enemy.kind === 'boss' ? 4 : 1;
-      castleLife = Math.max(0, castleLife - damage);
-      showToast(`城堡受到 ${damage} 点伤害`, 'bad');
-      if (castleLife <= 0) showEnd(false);
-    }
-  }
-
-  for (const unit of units) {
-    unit.cooldown = Math.max(0, unit.cooldown - dt);
-    if (unit.cooldown <= 0) attackWithUnit(unit);
   }
 
   effects = effects
     .map((effect) => ({ ...effect, life: effect.life - dt }))
     .filter((effect) => effect.life > 0);
-  enemies = enemies.filter((enemy) => !enemy.dead);
 
-  if (waveRunning && spawnIndex >= spawnPlan.length && enemies.length === 0 && !gameOver) finishWave();
-  updateUi();
+  updateHud();
 }
 
-function unitStats(unit: Unit): { damage: number; range: number; rate: number; splash: number } {
-  const levelScale = 1 + (unit.level - 1) * 0.52;
-  if (unit.type === 'archer') return { damage: 10 * levelScale, range: 122 + unit.level * 7, rate: 0.42 - unit.level * 0.035, splash: 0 };
-  if (unit.type === 'mage') return { damage: 20 * levelScale, range: 105 + unit.level * 5, rate: 1.18 - unit.level * 0.08, splash: 34 + unit.level * 8 };
-  return { damage: 24 * levelScale, range: 58 + unit.level * 3, rate: 0.82 - unit.level * 0.06, splash: 0 };
+function updateHud(): void {
+  playerHpEl.textContent = `${Math.ceil(playerBaseHp)}`;
+  enemyHpEl.textContent = `${Math.ceil(enemyBaseHp)}`;
+  waveStat.textContent = `${currentWave} / ${TOTAL_WAVES}`;
+  inkStat.textContent = `${Math.floor(ink)} / ${MAX_INK}`;
+  goldStat.textContent = `${Math.floor(gold)}`;
+  renderUpgrades();
 }
 
-function attackWithUnit(unit: Unit): void {
-  const spot = BUILD_SPOTS[unit.spotIndex];
-  const stats = unitStats(unit);
-  const candidates = enemies
-    .filter((enemy) => !enemy.dead && distance(spot, pointAtDistance(enemy.distance)) <= stats.range)
-    .sort((a, b) => b.distance - a.distance);
-  const target = candidates[0];
-  if (!target) return;
+function upgradeCost(type: UnitType): number {
+  const level = levels[type];
+  return 70 + (level - 1) * 70;
+}
 
-  const targetPoint = pointAtDistance(target.distance);
-  unit.cooldown = stats.rate;
-
-  if (unit.type === 'mage') {
-    for (const enemy of enemies) {
-      if (!enemy.dead && distance(targetPoint, pointAtDistance(enemy.distance)) <= stats.splash) damageEnemy(enemy, stats.damage);
-    }
-    effects.push({ kind: 'blast', from: spot, to: targetPoint, radius: stats.splash, life: 0.28, maxLife: 0.28 });
+function upgrade(type: UnitType): void {
+  const level = levels[type];
+  if (level >= 3) return;
+  const cost = upgradeCost(type);
+  if (gold < cost) {
+    showToast(`金币不足，还差 ${Math.ceil(cost - gold)}`, 'bad');
     return;
   }
-
-  if (unit.type === 'warrior') {
-    damageEnemy(target, stats.damage);
-    target.slowUntil = Math.max(target.slowUntil, gameTime + 0.9);
-    effects.push({ kind: 'slash', from: spot, to: targetPoint, radius: 20, life: 0.18, maxLife: 0.18 });
-    return;
-  }
-
-  damageEnemy(target, stats.damage);
-  effects.push({ kind: 'line', from: spot, to: targetPoint, radius: 0, life: 0.13, maxLife: 0.13 });
+  gold -= cost;
+  levels[type] += 1;
+  showToast(`${UNIT_META[type].name} 升到 Lv.${levels[type]}`, 'good');
+  renderUpgrades();
 }
 
-function damageEnemy(enemy: Enemy, amount: number): void {
-  if (enemy.dead) return;
-  enemy.hp -= amount;
-  if (enemy.hp <= 0) {
-    enemy.dead = true;
-    gold += enemy.reward;
-  }
-}
-
-function pointAtDistance(targetDistance: number): Point {
-  let remaining = Math.max(0, targetDistance);
-  for (const segment of pathSegments) {
-    if (remaining <= segment.length) {
-      const t = segment.length === 0 ? 0 : remaining / segment.length;
-      return {
-        x: segment.from.x + (segment.to.x - segment.from.x) * t,
-        y: segment.from.y + (segment.to.y - segment.from.y) * t
-      };
-    }
-    remaining -= segment.length;
-  }
-  return PATH[PATH.length - 1];
-}
-
-function distance(a: Point, b: Point): number {
-  return Math.hypot(a.x - b.x, a.y - b.y);
-}
-
-function drawBattlefield(): void {
-  battleCtx.clearRect(0, 0, WIDTH, HEIGHT);
-  battleCtx.fillStyle = '#2a3734';
-  battleCtx.fillRect(0, 0, WIDTH, HEIGHT);
-
-  battleCtx.strokeStyle = 'rgba(255,255,255,.035)';
-  battleCtx.lineWidth = 1;
-  for (let x = 0; x < WIDTH; x += 30) {
-    battleCtx.beginPath(); battleCtx.moveTo(x, 0); battleCtx.lineTo(x, HEIGHT); battleCtx.stroke();
-  }
-  for (let y = 0; y < HEIGHT; y += 30) {
-    battleCtx.beginPath(); battleCtx.moveTo(0, y); battleCtx.lineTo(WIDTH, y); battleCtx.stroke();
-  }
-
-  battleCtx.lineCap = 'round';
-  battleCtx.lineJoin = 'round';
-  battleCtx.beginPath();
-  battleCtx.moveTo(PATH[0].x, PATH[0].y);
-  for (let i = 1; i < PATH.length; i += 1) battleCtx.lineTo(PATH[i].x, PATH[i].y);
-  battleCtx.strokeStyle = '#6d573f';
-  battleCtx.lineWidth = 42;
-  battleCtx.stroke();
-  battleCtx.strokeStyle = '#b99a6a';
-  battleCtx.lineWidth = 30;
-  battleCtx.stroke();
-
-  drawCastle();
-
-  for (let i = 0; i < BUILD_SPOTS.length; i += 1) {
-    const spot = BUILD_SPOTS[i];
-    const unit = units.find((candidate) => candidate.spotIndex === i);
-    if (unit) drawUnit(unit, spot, selectedUnitSpot === i);
-    else drawBuildSpot(spot, selectedSummon !== null);
-  }
-
-  for (const enemy of enemies) drawEnemy(enemy);
-  for (const effect of effects) drawEffect(effect);
-}
-
-function drawCastle(): void {
-  battleCtx.save();
-  battleCtx.translate(365, 346);
-  battleCtx.fillStyle = '#d5d9e2';
-  battleCtx.fillRect(-18, -24, 36, 44);
-  battleCtx.fillStyle = '#8991a4';
-  battleCtx.fillRect(-23, -31, 10, 16);
-  battleCtx.fillRect(-5, -31, 10, 16);
-  battleCtx.fillRect(13, -31, 10, 16);
-  battleCtx.fillStyle = '#4b5264';
-  battleCtx.fillRect(-6, 3, 12, 17);
-  battleCtx.restore();
-}
-
-function drawBuildSpot(spot: Point, active: boolean): void {
-  battleCtx.beginPath();
-  battleCtx.arc(spot.x, spot.y, 22, 0, Math.PI * 2);
-  battleCtx.fillStyle = active ? 'rgba(240,157,72,.19)' : 'rgba(14,18,21,.28)';
-  battleCtx.fill();
-  battleCtx.strokeStyle = active ? '#ef9d48' : '#61706c';
-  battleCtx.lineWidth = active ? 2.5 : 1.5;
-  battleCtx.stroke();
-  battleCtx.fillStyle = active ? '#efb26f' : '#71817d';
-  battleCtx.font = '700 16px system-ui';
-  battleCtx.textAlign = 'center';
-  battleCtx.textBaseline = 'middle';
-  battleCtx.fillText('+', spot.x, spot.y - 1);
-}
-
-function drawUnit(unit: Unit, spot: Point, selected: boolean): void {
-  battleCtx.save();
-  battleCtx.translate(spot.x, spot.y);
-  if (selected) {
-    battleCtx.beginPath(); battleCtx.arc(0, 0, 25, 0, Math.PI * 2);
-    battleCtx.strokeStyle = '#f6c579'; battleCtx.lineWidth = 2; battleCtx.stroke();
-  }
-
-  battleCtx.strokeStyle = '#f0eadb';
-  battleCtx.fillStyle = '#f0eadb';
-  battleCtx.lineWidth = 2.4;
-  battleCtx.lineCap = 'round';
-
-  if (unit.type === 'mage') {
-    battleCtx.beginPath(); battleCtx.arc(0, -10, 7, 0, Math.PI * 2); battleCtx.stroke();
-    battleCtx.beginPath(); battleCtx.moveTo(0, -3); battleCtx.lineTo(0, 13); battleCtx.moveTo(0, 2); battleCtx.lineTo(-8, 7); battleCtx.moveTo(0, 2); battleCtx.lineTo(8, 6); battleCtx.moveTo(0, 13); battleCtx.lineTo(-6, 21); battleCtx.moveTo(0, 13); battleCtx.lineTo(6, 21); battleCtx.stroke();
-    battleCtx.strokeStyle = '#cf7bff'; battleCtx.beginPath(); battleCtx.moveTo(10, -4); battleCtx.lineTo(10, 18); battleCtx.stroke();
-    battleCtx.beginPath(); battleCtx.arc(10, -7, 3, 0, Math.PI * 2); battleCtx.fillStyle = '#cf7bff'; battleCtx.fill();
-  } else if (unit.type === 'archer') {
-    battleCtx.beginPath(); battleCtx.moveTo(0, -18); battleCtx.lineTo(-8, -5); battleCtx.lineTo(8, -5); battleCtx.closePath(); battleCtx.stroke();
-    battleCtx.beginPath(); battleCtx.moveTo(0, -5); battleCtx.lineTo(0, 14); battleCtx.moveTo(0, 1); battleCtx.lineTo(-7, 6); battleCtx.moveTo(0, 1); battleCtx.lineTo(8, 4); battleCtx.moveTo(0, 14); battleCtx.lineTo(-6, 21); battleCtx.moveTo(0, 14); battleCtx.lineTo(6, 21); battleCtx.stroke();
-    battleCtx.strokeStyle = '#f1c75b'; battleCtx.beginPath(); battleCtx.arc(10, 6, 7, -Math.PI / 2, Math.PI / 2); battleCtx.stroke();
-  } else {
-    battleCtx.strokeRect(-7, -17, 14, 14);
-    battleCtx.beginPath(); battleCtx.moveTo(0, -3); battleCtx.lineTo(0, 14); battleCtx.moveTo(0, 2); battleCtx.lineTo(-8, 8); battleCtx.moveTo(0, 2); battleCtx.lineTo(8, 7); battleCtx.moveTo(0, 14); battleCtx.lineTo(-6, 21); battleCtx.moveTo(0, 14); battleCtx.lineTo(6, 21); battleCtx.stroke();
-    battleCtx.strokeStyle = '#8fc9ff'; battleCtx.beginPath(); battleCtx.moveTo(-10, 1); battleCtx.lineTo(-10, 15); battleCtx.stroke();
-    battleCtx.strokeStyle = '#e5e7eb'; battleCtx.beginPath(); battleCtx.moveTo(9, 1); battleCtx.lineTo(15, -8); battleCtx.stroke();
-  }
-
-  battleCtx.fillStyle = '#0e1118';
-  battleCtx.beginPath(); battleCtx.arc(15, -17, 8, 0, Math.PI * 2); battleCtx.fill();
-  battleCtx.fillStyle = '#f4b969';
-  battleCtx.font = '700 9px system-ui'; battleCtx.textAlign = 'center'; battleCtx.textBaseline = 'middle';
-  battleCtx.fillText(String(unit.level), 15, -17);
-  battleCtx.restore();
-}
-
-function drawEnemy(enemy: Enemy): void {
-  const point = pointAtDistance(enemy.distance);
-  battleCtx.save();
-  battleCtx.translate(point.x, point.y);
-  const radius = enemy.kind === 'boss' ? 16 : enemy.kind === 'tank' ? 12 : 9;
-  battleCtx.beginPath(); battleCtx.arc(0, 0, radius, 0, Math.PI * 2);
-  battleCtx.fillStyle = enemy.kind === 'runner' ? '#e5c34f' : enemy.kind === 'tank' ? '#956f58' : enemy.kind === 'boss' ? '#8e4b9e' : '#c76558';
-  battleCtx.fill();
-  battleCtx.strokeStyle = enemy.slowUntil > gameTime ? '#8fc9ff' : '#442f2a';
-  battleCtx.lineWidth = 2; battleCtx.stroke();
-  battleCtx.fillStyle = '#20242d';
-  battleCtx.font = enemy.kind === 'boss' ? '700 12px system-ui' : '700 9px system-ui';
-  battleCtx.textAlign = 'center'; battleCtx.textBaseline = 'middle';
-  battleCtx.fillText(enemy.kind === 'boss' ? 'B' : enemy.kind === 'runner' ? 'R' : enemy.kind === 'tank' ? 'T' : '•', 0, 0);
-
-  const barWidth = enemy.kind === 'boss' ? 40 : 26;
-  battleCtx.fillStyle = 'rgba(15,17,24,.75)'; battleCtx.fillRect(-barWidth / 2, -radius - 9, barWidth, 4);
-  battleCtx.fillStyle = '#72d58c'; battleCtx.fillRect(-barWidth / 2, -radius - 9, barWidth * Math.max(0, enemy.hp / enemy.maxHp), 4);
-  battleCtx.restore();
-}
-
-function drawEffect(effect: Effect): void {
-  const alpha = Math.max(0, effect.life / effect.maxLife);
-  battleCtx.save();
-  battleCtx.globalAlpha = alpha;
-  if (effect.kind === 'line') {
-    battleCtx.strokeStyle = '#f4d870'; battleCtx.lineWidth = 2;
-    battleCtx.beginPath(); battleCtx.moveTo(effect.from.x, effect.from.y); battleCtx.lineTo(effect.to.x, effect.to.y); battleCtx.stroke();
-  } else if (effect.kind === 'blast') {
-    battleCtx.strokeStyle = '#cf7bff'; battleCtx.lineWidth = 4;
-    battleCtx.beginPath(); battleCtx.arc(effect.to.x, effect.to.y, effect.radius * (1.15 - alpha * .15), 0, Math.PI * 2); battleCtx.stroke();
-  } else {
-    battleCtx.strokeStyle = '#d9efff'; battleCtx.lineWidth = 4;
-    battleCtx.beginPath(); battleCtx.arc(effect.to.x, effect.to.y, effect.radius, -.8, .8); battleCtx.stroke();
-  }
-  battleCtx.restore();
-}
-
-function canvasPoint(canvas: HTMLCanvasElement, event: PointerEvent): Point {
-  const rect = canvas.getBoundingClientRect();
-  return {
-    x: (event.clientX - rect.left) * canvas.width / rect.width,
-    y: (event.clientY - rect.top) * canvas.height / rect.height
-  };
-}
-
-battleCanvas.addEventListener('pointerdown', (event) => {
-  if (gameOver) return;
-  const point = canvasPoint(battleCanvas, event);
-  let nearest = -1;
-  let nearestDistance = Infinity;
-  BUILD_SPOTS.forEach((spot, index) => {
-    const d = distance(point, spot);
-    if (d < nearestDistance) { nearest = index; nearestDistance = d; }
-  });
-  if (nearest < 0 || nearestDistance > 30) return;
-
-  const existing = units.find((unit) => unit.spotIndex === nearest);
-  if (existing) {
-    selectedUnitSpot = nearest;
-    selectedSummon = null;
-    setRecognition('已选守卫', `${UNIT_META[existing.type].symbol} ${UNIT_META[existing.type].name} Lv.${existing.level}`);
-    renderUnitPanel();
-    return;
-  }
-
-  if (!selectedSummon) {
-    showToast('先在下方画 ○、△ 或 □', 'bad');
-    return;
-  }
-
-  const meta = UNIT_META[selectedSummon];
-  if (gold < meta.cost) {
-    showToast(`金币不足，需要 ${meta.cost}`, 'bad');
-    return;
-  }
-
-  gold -= meta.cost;
-  units.push({ type: selectedSummon, spotIndex: nearest, level: 1, cooldown: 0 });
-  showToast(`${meta.name} 已部署`, 'good');
-  selectedSummon = null;
-  selectedUnitSpot = nearest;
-  clearDrawPad();
-  setRecognition('部署成功', '点击守卫可以升级');
-  renderUnitPanel();
-  updateUi();
-});
-
-function upgradeCost(unit: Unit): number {
-  return Math.round(UNIT_META[unit.type].cost * (0.75 + unit.level * 0.65));
-}
-
-function renderUnitPanel(): void {
-  const unit = selectedUnitSpot === null ? undefined : units.find((candidate) => candidate.spotIndex === selectedUnitSpot);
-  if (!unit) {
-    unitPanel.classList.remove('is-show');
-    unitPanel.innerHTML = '';
-    return;
-  }
-  const stats = unitStats(unit);
-  const cost = upgradeCost(unit);
-  const maxed = unit.level >= 3;
-  unitPanel.classList.add('is-show');
-  unitPanel.innerHTML = `
-    <div class="dd-unit-row">
-      <div class="dd-unit-copy">
-        <strong>${UNIT_META[unit.type].symbol} ${UNIT_META[unit.type].name} · Lv.${unit.level}</strong>
-        <span>攻击 ${Math.round(stats.damage)} · 射程 ${Math.round(stats.range)} · ${unit.type === 'mage' ? `范围 ${Math.round(stats.splash)}` : unit.type === 'warrior' ? '命中减速' : '高速单体'}</span>
+function renderUpgrades(): void {
+  const order: UnitType[] = ['warrior', 'archer', 'mage'];
+  upgradePanel.innerHTML = order.map((type) => {
+    const meta = UNIT_META[type];
+    const level = levels[type];
+    const maxed = level >= 3;
+    const cost = upgradeCost(type);
+    return `
+      <div class="dd-upgrade-item">
+        <div class="dd-unit-symbol ${type}">${meta.symbol}</div>
+        <div class="dd-upgrade-copy">
+          <strong>${meta.name} <em>Lv.${level}</em></strong>
+          <span>${type === 'warrior' ? '3人一队 · 前排顶线' : type === 'archer' ? '2人一队 · 远程单体' : '1人 · 范围清场'}</span>
+        </div>
+        <button class="dd-btn dd-upgrade-btn" data-upgrade="${type}" ${maxed || gold < cost ? 'disabled' : ''}>
+          ${maxed ? 'MAX' : `升级 ${cost}`}
+        </button>
       </div>
-      <button class="dd-btn" id="upgradeUnit" ${maxed || gold < cost ? 'disabled' : ''}>${maxed ? 'MAX' : `升级 ${cost}`}</button>
-    </div>
-  `;
-  unitPanel.querySelector<HTMLButtonElement>('#upgradeUnit')?.addEventListener('click', () => {
-    if (unit.level >= 3) return;
-    const nextCost = upgradeCost(unit);
-    if (gold < nextCost) return;
-    gold -= nextCost;
-    unit.level += 1;
-    showToast(`${UNIT_META[unit.type].name} 升到 Lv.${unit.level}`, 'good');
-    renderUnitPanel();
-    updateUi();
+    `;
+  }).join('');
+
+  upgradePanel.querySelectorAll<HTMLButtonElement>('[data-upgrade]').forEach((button) => {
+    button.addEventListener('click', () => upgrade(button.dataset.upgrade as UnitType));
   });
 }
 
-let drawing = false;
-let strokePoints: Point[] = [];
+function drawBackground(): void {
+  const sky = ctx.createLinearGradient(0, 0, 0, HEIGHT);
+  sky.addColorStop(0, '#202a35');
+  sky.addColorStop(0.62, '#344147');
+  sky.addColorStop(0.63, '#4f4d3f');
+  sky.addColorStop(1, '#23251f');
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-drawCanvas.addEventListener('pointerdown', (event) => {
-  if (gameOver) return;
-  drawing = true;
-  strokePoints = [canvasPoint(drawCanvas, event)];
-  drawCanvas.setPointerCapture(event.pointerId);
-  drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-  padHint.classList.add('is-hidden');
-  drawCtx.strokeStyle = '#f4b969';
-  drawCtx.lineWidth = 5;
-  drawCtx.lineCap = 'round';
-  drawCtx.lineJoin = 'round';
-  drawCtx.beginPath();
-  drawCtx.moveTo(strokePoints[0].x, strokePoints[0].y);
-});
+  ctx.fillStyle = 'rgba(255,255,255,.035)';
+  for (let x = 150; x < WIDTH; x += 170) {
+    ctx.fillRect(x, 75 + (x % 80), 2, 150);
+  }
 
-drawCanvas.addEventListener('pointermove', (event) => {
-  if (!drawing) return;
-  const point = canvasPoint(drawCanvas, event);
-  strokePoints.push(point);
-  drawCtx.lineTo(point.x, point.y);
-  drawCtx.stroke();
-});
+  ctx.fillStyle = '#5d5945';
+  ctx.fillRect(0, GROUND_Y + 20, WIDTH, HEIGHT - GROUND_Y);
+  ctx.fillStyle = '#7c7354';
+  ctx.fillRect(0, GROUND_Y + 18, WIDTH, 4);
 
-function finishDrawing(): void {
-  if (!drawing) return;
-  drawing = false;
-  const recognized = recognizeShape(strokePoints);
-  if (!recognized) {
-    selectedSummon = null;
-    setRecognition('没认出来', '尽量一笔闭合画 ○ △ □');
-    showToast('形状要闭合一些，再画一次', 'bad');
+  ctx.setLineDash([10, 12]);
+  ctx.strokeStyle = 'rgba(255,255,255,.15)';
+  ctx.beginPath();
+  ctx.moveTo(WIDTH / 2, 65);
+  ctx.lineTo(WIDTH / 2, GROUND_Y + 15);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.font = '700 12px system-ui';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255,255,255,.32)';
+  ctx.fillText('FRONT LINE', WIDTH / 2, 58);
+}
+
+function drawBase(side: Side): void {
+  const x = side === 'player' ? PLAYER_BASE_X : ENEMY_BASE_X;
+  const hp = side === 'player' ? playerBaseHp : enemyBaseHp;
+  ctx.save();
+  ctx.translate(x, GROUND_Y + 15);
+  if (side === 'enemy') ctx.scale(-1, 1);
+
+  ctx.fillStyle = side === 'player' ? '#688fb8' : '#aa5e5e';
+  ctx.fillRect(-32, -92, 64, 92);
+  ctx.fillStyle = '#222730';
+  ctx.fillRect(-15, -48, 30, 48);
+  ctx.fillStyle = side === 'player' ? '#83add6' : '#c77979';
+  ctx.beginPath();
+  ctx.moveTo(-42, -92);
+  ctx.lineTo(0, -126);
+  ctx.lineTo(42, -92);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  const barWidth = 96;
+  const ratio = Math.max(0, hp / MAX_BASE_HP);
+  ctx.fillStyle = 'rgba(0,0,0,.45)';
+  ctx.fillRect(x - barWidth / 2, 28, barWidth, 9);
+  ctx.fillStyle = side === 'player' ? '#87c3ef' : '#ed8989';
+  ctx.fillRect(x - barWidth / 2, 28, barWidth * ratio, 9);
+}
+
+function drawShapeHead(unit: Fighter): void {
+  const size = unit.size;
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = unit.side === 'player' ? '#eef6ff' : '#ffd9d9';
+  ctx.fillStyle = unit.side === 'player' ? '#547ea8' : '#8f4c4c';
+
+  if (unit.side === 'enemy') {
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.7, -size * 1.5);
+    ctx.lineTo(0, -size * 2.15);
+    ctx.lineTo(size * 0.7, -size * 1.5);
+    ctx.lineTo(0, -size * 0.95);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
     return;
   }
-  selectedSummon = recognized;
-  selectedUnitSpot = null;
-  renderUnitPanel();
-  const meta = UNIT_META[recognized];
-  setRecognition(`${meta.symbol} ${meta.name}`, `花费 ${meta.cost} · 请选择空位`);
-  setStatus(`识别为${meta.name}。现在点战场上发亮的空建造点。`);
-}
 
-drawCanvas.addEventListener('pointerup', finishDrawing);
-drawCanvas.addEventListener('pointercancel', finishDrawing);
-
-function recognizeShape(points: Point[]): UnitType | null {
-  if (points.length < 8) return null;
-  const xs = points.map((point) => point.x);
-  const ys = points.map((point) => point.y);
-  const minX = Math.min(...xs); const maxX = Math.max(...xs);
-  const minY = Math.min(...ys); const maxY = Math.max(...ys);
-  const width = maxX - minX; const height = maxY - minY;
-  const diagonal = Math.hypot(width, height);
-  if (diagonal < 35 || width < 18 || height < 18) return null;
-
-  const closure = distance(points[0], points[points.length - 1]) / diagonal;
-  if (closure > 0.42) return null;
-
-  const closed = [...points, points[0]];
-  let perimeter = 0;
-  let twiceArea = 0;
-  for (let i = 0; i < closed.length - 1; i += 1) {
-    perimeter += distance(closed[i], closed[i + 1]);
-    twiceArea += closed[i].x * closed[i + 1].y - closed[i + 1].x * closed[i].y;
+  if (unit.type === 'mage') {
+    ctx.beginPath();
+    ctx.arc(0, -size * 1.55, size * 0.72, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  } else if (unit.type === 'archer') {
+    ctx.beginPath();
+    ctx.moveTo(0, -size * 2.3);
+    ctx.lineTo(size * 0.82, -size * 0.9);
+    ctx.lineTo(-size * 0.82, -size * 0.9);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  } else {
+    ctx.fillRect(-size * 0.7, -size * 2.15, size * 1.4, size * 1.4);
+    ctx.strokeRect(-size * 0.7, -size * 2.15, size * 1.4, size * 1.4);
   }
-  const area = Math.abs(twiceArea) / 2;
-  if (perimeter <= 0 || area <= 0) return null;
-  const circularity = 4 * Math.PI * area / (perimeter * perimeter);
-  const fillRatio = area / Math.max(1, width * height);
-
-  if (circularity >= 0.79 && fillRatio < 0.9) return 'mage';
-  if (fillRatio >= 0.66 || circularity >= 0.68) return 'warrior';
-  return 'archer';
 }
 
-function clearDrawPad(): void {
-  drawing = false;
-  strokePoints = [];
-  drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-  padHint.classList.remove('is-hidden');
+function drawFighter(unit: Fighter): void {
+  ctx.save();
+  ctx.translate(unit.x, unit.y);
+  if (unit.side === 'enemy') ctx.scale(-1, 1);
+
+  drawShapeHead(unit);
+  ctx.strokeStyle = unit.side === 'player' ? '#dfeeff' : '#ffe4e4';
+  ctx.lineWidth = 3;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(0, -unit.size * 0.8);
+  ctx.lineTo(0, unit.size * 0.25);
+  ctx.moveTo(0, -unit.size * 0.35);
+  ctx.lineTo(unit.size * 0.85, 0);
+  ctx.moveTo(0, -unit.size * 0.35);
+  ctx.lineTo(-unit.size * 0.75, 0);
+  ctx.moveTo(0, unit.size * 0.25);
+  ctx.lineTo(unit.size * 0.62, unit.size);
+  ctx.moveTo(0, unit.size * 0.25);
+  ctx.lineTo(-unit.size * 0.62, unit.size);
+  ctx.stroke();
+
+  if (unit.side === 'player' && unit.type === 'archer') {
+    ctx.strokeStyle = '#d7bb7b';
+    ctx.beginPath();
+    ctx.arc(unit.size * 0.85, -unit.size * 0.05, unit.size * 0.58, -Math.PI / 2, Math.PI / 2);
+    ctx.stroke();
+  } else if (unit.side === 'player' && unit.type === 'mage') {
+    ctx.strokeStyle = '#d8a8ff';
+    ctx.beginPath();
+    ctx.moveTo(unit.size * 0.72, 0);
+    ctx.lineTo(unit.size * 1.15, -unit.size * 1.05);
+    ctx.stroke();
+  } else {
+    ctx.strokeStyle = '#d9d9d9';
+    ctx.beginPath();
+    ctx.moveTo(unit.size * 0.75, 0);
+    ctx.lineTo(unit.size * 1.2, -unit.size * 0.55);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  const barWidth = Math.max(22, unit.size * 2.1);
+  const ratio = Math.max(0, unit.hp / unit.maxHp);
+  ctx.fillStyle = 'rgba(0,0,0,.45)';
+  ctx.fillRect(unit.x - barWidth / 2, unit.y - unit.size * 2.8, barWidth, 4);
+  ctx.fillStyle = unit.side === 'player' ? '#85ccff' : '#ff8b8b';
+  ctx.fillRect(unit.x - barWidth / 2, unit.y - unit.size * 2.8, barWidth * ratio, 4);
 }
 
-mustElement<HTMLButtonElement>('clearDraw').addEventListener('click', () => {
-  clearDrawPad();
-  selectedSummon = null;
-  setRecognition('等待绘制', '');
-  setStatus('画 ○ 召唤法师，△ 召唤弓箭手，□ 召唤战士。');
-});
+function drawEffects(): void {
+  for (const effect of effects) {
+    const alpha = Math.max(0, effect.life / effect.maxLife);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = effect.side === 'player' ? '#b9dcff' : '#ffb0b0';
+    ctx.fillStyle = effect.side === 'player' ? 'rgba(162,207,255,.24)' : 'rgba(255,132,132,.22)';
+    ctx.lineWidth = effect.kind === 'shot' ? 2 : 4;
 
-mustElement<HTMLButtonElement>('cancelSummon').addEventListener('click', () => {
-  selectedSummon = null;
-  selectedUnitSpot = null;
-  clearDrawPad();
-  renderUnitPanel();
-  setRecognition('已取消', '');
-});
-
-waveButton.addEventListener('click', startWave);
-
-function setRecognition(primary: string, secondary: string): void {
-  recognitionText.innerHTML = secondary ? `${primary}<br><small>${secondary}</small>` : primary;
+    if (effect.kind === 'blast') {
+      ctx.beginPath();
+      ctx.arc(effect.to.x, effect.to.y, effect.radius * (1.1 - alpha * 0.2), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(effect.from.x, effect.from.y);
+      ctx.lineTo(effect.to.x, effect.to.y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
 }
 
-function setStatus(text: string): void {
-  statusText.textContent = text;
+function render(): void {
+  drawBackground();
+  drawBase('player');
+  drawBase('enemy');
+
+  const sorted = [...fighters].sort((a, b) => a.y - b.y);
+  for (const fighter of sorted) drawFighter(fighter);
+  drawEffects();
+
+  if (!battleStarted && !gameOver) {
+    ctx.fillStyle = 'rgba(7,10,14,.58)';
+    ctx.fillRect(WIDTH / 2 - 175, 118, 350, 76);
+    ctx.fillStyle = '#f7f4ea';
+    ctx.font = '800 22px system-ui';
+    ctx.textAlign = 'center';
+    ctx.fillText('先画兵，再开始战斗', WIDTH / 2, 150);
+    ctx.font = '500 13px system-ui';
+    ctx.fillStyle = '#c9ced5';
+    ctx.fillText('你的部队会从左侧自动向右推进', WIDTH / 2, 176);
+  }
 }
 
 function showToast(message: string, tone: 'good' | 'bad'): void {
@@ -709,69 +677,182 @@ function showToast(message: string, tone: 'good' | 'bad'): void {
   toastTimer = window.setTimeout(() => {
     toast.className = 'dd-toast';
     toastTimer = null;
-  }, 1500);
-}
-
-function updateUi(): void {
-  waveStat.textContent = `${currentWave} / ${TOTAL_WAVES}`;
-  lifeStat.textContent = `❤️ ${castleLife}`;
-  goldStat.textContent = `💰 ${gold}`;
-  waveButton.disabled = waveRunning || gameOver || currentWave >= TOTAL_WAVES;
-  waveButton.textContent = waveRunning ? `Wave ${currentWave} 战斗中` : currentWave >= TOTAL_WAVES ? '最终波次' : `开始 Wave ${currentWave + 1}`;
-  if (selectedUnitSpot !== null) renderUnitPanel();
-}
-
-function showEnd(win: boolean): void {
-  if (gameOver) return;
-  gameOver = true;
-  waveRunning = false;
-  const modal = document.createElement('div');
-  modal.className = 'dd-modal';
-  modal.innerHTML = `
-    <section class="dd-modal-card">
-      <div class="big">${win ? '🏆' : '💥'}</div>
-      <h2>${win ? '守住了！' : '城堡失守'}</h2>
-      <p>${win ? '你撑过了 5 波，并击退了 Boss。下一版会加入局内三选一强化和职业进阶。' : `你撑到 Wave ${currentWave}。重新调整放置位置和升级顺序再试一次。`}</p>
-      <button class="dd-btn dd-btn-primary" id="restartGame">再来一局</button>
-    </section>
-  `;
-  document.body.append(modal);
-  modal.querySelector<HTMLButtonElement>('#restartGame')?.addEventListener('click', () => {
-    modal.remove();
-    resetGame();
-  });
+  }, 1300);
 }
 
 function resetGame(): void {
-  gold = 240;
-  castleLife = 10;
-  currentWave = 0;
-  waveRunning = false;
-  gameOver = false;
-  gameTime = 0;
-  waveTime = 0;
-  spawnPlan = [];
-  spawnIndex = 0;
-  selectedSummon = null;
-  selectedUnitSpot = null;
-  units = [];
-  enemies = [];
+  fighters = [];
   effects = [];
-  clearDrawPad();
-  renderUnitPanel();
-  setRecognition('等待绘制', '');
-  setStatus('先画一个形状召唤守卫，也可以直接开始第一波。');
-  updateUi();
+  playerBaseHp = MAX_BASE_HP;
+  enemyBaseHp = MAX_BASE_HP;
+  ink = 80;
+  gold = 0;
+  gameTime = 0;
+  battleStarted = false;
+  gameOver = false;
+  currentWave = 0;
+  nextSpawnAt = 0;
+  bossSpawned = false;
+  levels.warrior = 1;
+  levels.archer = 1;
+  levels.mage = 1;
+  startBattle.disabled = false;
+  startBattle.textContent = '开始战斗';
+  battleStatus.textContent = '准备阶段';
+  recognitionText.textContent = '等待绘制';
+  clearDrawing();
+  updateHud();
 }
+
+startBattle.addEventListener('click', () => {
+  if (battleStarted || gameOver) return;
+  battleStarted = true;
+  currentWave = 1;
+  nextSpawnAt = 0;
+  startBattle.disabled = true;
+  startBattle.textContent = '战斗中';
+  battleStatus.textContent = 'Wave 1';
+  showToast('敌军从右侧出现，往前推！', 'good');
+});
+
+restartBattle.addEventListener('click', resetGame);
+
+upgradePanel.addEventListener('click', (event) => {
+  const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-upgrade]');
+  if (!button) return;
+  upgrade(button.dataset.upgrade as UnitType);
+});
+
+let drawing = false;
+let drawPoints: Point[] = [];
+
+function canvasPoint(event: PointerEvent): Point {
+  const rect = drawCanvas.getBoundingClientRect();
+  return {
+    x: (event.clientX - rect.left) * (drawCanvas.width / rect.width),
+    y: (event.clientY - rect.top) * (drawCanvas.height / rect.height)
+  };
+}
+
+function clearDrawing(): void {
+  drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+  drawPoints = [];
+  padHint.classList.remove('is-hidden');
+}
+
+function simplify(points: Point[], epsilon: number): Point[] {
+  if (points.length < 3) return points;
+  const first = points[0];
+  const last = points[points.length - 1];
+  let maxDistance = 0;
+  let index = 0;
+
+  for (let i = 1; i < points.length - 1; i += 1) {
+    const distance = perpendicularDistance(points[i], first, last);
+    if (distance > maxDistance) {
+      index = i;
+      maxDistance = distance;
+    }
+  }
+
+  if (maxDistance > epsilon) {
+    const left = simplify(points.slice(0, index + 1), epsilon);
+    const right = simplify(points.slice(index), epsilon);
+    return [...left.slice(0, -1), ...right];
+  }
+  return [first, last];
+}
+
+function perpendicularDistance(point: Point, lineStart: Point, lineEnd: Point): number {
+  const dx = lineEnd.x - lineStart.x;
+  const dy = lineEnd.y - lineStart.y;
+  if (dx === 0 && dy === 0) return Math.hypot(point.x - lineStart.x, point.y - lineStart.y);
+  const t = ((point.x - lineStart.x) * dx + (point.y - lineStart.y) * dy) / (dx * dx + dy * dy);
+  const projectedX = lineStart.x + t * dx;
+  const projectedY = lineStart.y + t * dy;
+  return Math.hypot(point.x - projectedX, point.y - projectedY);
+}
+
+function recognize(points: Point[]): UnitType | null {
+  if (points.length < 12) return null;
+  const xs = points.map((point) => point.x);
+  const ys = points.map((point) => point.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const width = maxX - minX;
+  const height = maxY - minY;
+  const diagonal = Math.hypot(width, height);
+  if (width < 28 || height < 28 || diagonal < 45) return null;
+
+  const closure = Math.hypot(points[0].x - points[points.length - 1].x, points[0].y - points[points.length - 1].y);
+  if (closure > diagonal * 0.42) return null;
+
+  const sampled = simplify(points, diagonal * 0.075);
+  const corners = Math.max(0, sampled.length - 1);
+  const center = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+  const radii = points.map((point) => Math.hypot(point.x - center.x, point.y - center.y));
+  const meanRadius = radii.reduce((sum, value) => sum + value, 0) / radii.length;
+  const variance = radii.reduce((sum, value) => sum + (value - meanRadius) ** 2, 0) / radii.length;
+  const radialNoise = Math.sqrt(variance) / Math.max(1, meanRadius);
+
+  if (radialNoise < 0.19 && corners > 5) return 'mage';
+  if (corners <= 4) return 'archer';
+  if (corners <= 6) return 'warrior';
+  return radialNoise < 0.25 ? 'mage' : 'warrior';
+}
+
+function finishDrawing(): void {
+  drawing = false;
+  const result = recognize(drawPoints);
+  if (!result) {
+    recognitionText.textContent = '没识别出来';
+    showToast('尽量一笔闭合画 ○ △ □', 'bad');
+    window.setTimeout(clearDrawing, 500);
+    return;
+  }
+
+  const meta = UNIT_META[result];
+  recognitionText.textContent = `${meta.symbol} ${meta.name}`;
+  summon(result);
+  window.setTimeout(clearDrawing, 260);
+}
+
+drawCanvas.addEventListener('pointerdown', (event) => {
+  drawing = true;
+  drawPoints = [canvasPoint(event)];
+  drawCanvas.setPointerCapture(event.pointerId);
+  padHint.classList.add('is-hidden');
+  drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+  drawCtx.strokeStyle = '#f2c477';
+  drawCtx.lineWidth = 7;
+  drawCtx.lineCap = 'round';
+  drawCtx.lineJoin = 'round';
+  drawCtx.beginPath();
+  drawCtx.moveTo(drawPoints[0].x, drawPoints[0].y);
+});
+
+drawCanvas.addEventListener('pointermove', (event) => {
+  if (!drawing) return;
+  const point = canvasPoint(event);
+  drawPoints.push(point);
+  drawCtx.lineTo(point.x, point.y);
+  drawCtx.stroke();
+});
+
+drawCanvas.addEventListener('pointerup', finishDrawing);
+drawCanvas.addEventListener('pointercancel', finishDrawing);
 
 let lastFrame = performance.now();
 function frame(now: number): void {
-  const dt = Math.min(0.05, Math.max(0, (now - lastFrame) / 1000));
+  const dt = Math.min(0.05, (now - lastFrame) / 1000);
   lastFrame = now;
   update(dt);
-  drawBattlefield();
-  window.requestAnimationFrame(frame);
+  if (battleStarted && !gameOver) battleStatus.textContent = `Wave ${currentWave} · ${Math.floor(gameTime)}s`;
+  render();
+  requestAnimationFrame(frame);
 }
 
 resetGame();
-window.requestAnimationFrame(frame);
+requestAnimationFrame(frame);
