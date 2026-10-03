@@ -34,10 +34,10 @@ type Effect = {
   side: Side;
 };
 
-const app = document.querySelector<HTMLDivElement>('#draw-defense-app');
-if (!app) throw new Error('Missing #draw-defense-app');
+const root = document.querySelector<HTMLDivElement>('#draw-defense-app');
+if (!root) throw new Error('Missing #draw-defense-app');
 
-app.innerHTML = `
+root.innerHTML = `
   <main class="dd-shell">
     <header class="dd-topbar">
       <div>
@@ -71,7 +71,7 @@ app.innerHTML = `
       <section class="dd-draw-card">
         <div class="dd-section-head">
           <div>
-            <strong>画一个兵种，立刻从左边出兵</strong>
+            <strong>画一个兵种，立刻从左边暴兵</strong>
             <p>○ 法师 · △ 弓箭手 · □ 战士</p>
           </div>
           <div id="recognitionText" class="dd-recognition">等待绘制</div>
@@ -80,21 +80,21 @@ app.innerHTML = `
           <canvas id="drawPad" width="430" height="130" aria-label="手画召唤区域"></canvas>
           <div class="dd-pad-hint" id="padHint"><span>○</span><span>△</span><span>□</span></div>
         </div>
-        <div class="dd-resource-note">墨水自动回复，击杀也会返还墨水。画一次会直接暴一小队兵。</div>
+        <div class="dd-resource-note">墨水自动回复，击杀也会返还墨水。画一次直接出一小队兵。</div>
       </section>
 
       <section class="dd-army-card">
         <div class="dd-section-head">
           <div>
             <strong>兵种升级</strong>
-            <p>升级后，新出的同类单位永久变强</p>
+            <p>升级后，之后出的同类单位都会变强</p>
           </div>
         </div>
         <div class="dd-upgrades" id="upgradePanel"></div>
       </section>
     </section>
 
-    <p class="dd-help">目标：把战线从左向右推过去，打爆敌方基地。战士顶线，弓箭手远程持续输出，法师负责清群怪。</p>
+    <p class="dd-help">目标：把战线从左向右推过去，打爆敌方基地。战士顶线，弓箭手远程持续输出，法师清群怪。</p>
   </main>
 `;
 
@@ -120,7 +120,6 @@ const battleCanvas = mustCanvas('battlefield');
 const ctx = mustContext(battleCanvas);
 const drawCanvas = mustCanvas('drawPad');
 const drawCtx = mustContext(drawCanvas);
-
 const playerHpEl = mustElement<HTMLElement>('playerHp');
 const enemyHpEl = mustElement<HTMLElement>('enemyHp');
 const waveStat = mustElement<HTMLElement>('waveStat');
@@ -131,8 +130,8 @@ const recognitionText = mustElement<HTMLElement>('recognitionText');
 const padHint = mustElement<HTMLElement>('padHint');
 const upgradePanel = mustElement<HTMLElement>('upgradePanel');
 const toast = mustElement<HTMLElement>('toast');
-const startBattle = mustElement<HTMLButtonElement>('startBattle');
-const restartBattle = mustElement<HTMLButtonElement>('restartBattle');
+const startBattleButton = mustElement<HTMLButtonElement>('startBattle');
+const restartBattleButton = mustElement<HTMLButtonElement>('restartBattle');
 
 const WIDTH = battleCanvas.width;
 const HEIGHT = battleCanvas.height;
@@ -176,6 +175,7 @@ let currentWave = 0;
 let nextSpawnAt = 0;
 let bossSpawned = false;
 let toastTimer: number | null = null;
+let upgradeRenderKey = '';
 
 function playerStats(type: UnitType): Omit<Fighter, 'id' | 'side' | 'type' | 'x' | 'y' | 'cooldown' | 'dead'> {
   const meta = UNIT_META[type];
@@ -195,22 +195,15 @@ function playerStats(type: UnitType): Omit<Fighter, 'id' | 'side' | 'type' | 'x'
 
 function enemyStats(kind: EnemyKind): Omit<Fighter, 'id' | 'side' | 'kind' | 'x' | 'y' | 'cooldown' | 'dead'> {
   const waveScale = 1 + Math.max(0, currentWave - 1) * 0.16;
-  if (kind === 'runner') {
-    return { hp: 62 * waveScale, maxHp: 62 * waveScale, speed: 58, range: 26, damage: 12 * waveScale, rate: 0.72, splash: 0, size: 13 };
-  }
-  if (kind === 'tank') {
-    return { hp: 230 * waveScale, maxHp: 230 * waveScale, speed: 22, range: 30, damage: 24 * waveScale, rate: 0.9, splash: 0, size: 19 };
-  }
-  if (kind === 'boss') {
-    return { hp: 820, maxHp: 820, speed: 18, range: 40, damage: 42, rate: 0.88, splash: 0, size: 27 };
-  }
+  if (kind === 'runner') return { hp: 62 * waveScale, maxHp: 62 * waveScale, speed: 58, range: 26, damage: 12 * waveScale, rate: 0.72, splash: 0, size: 13 };
+  if (kind === 'tank') return { hp: 230 * waveScale, maxHp: 230 * waveScale, speed: 22, range: 30, damage: 24 * waveScale, rate: 0.9, splash: 0, size: 19 };
+  if (kind === 'boss') return { hp: 820, maxHp: 820, speed: 18, range: 40, damage: 42, rate: 0.88, splash: 0, size: 27 };
   return { hp: 92 * waveScale, maxHp: 92 * waveScale, speed: 35, range: 28, damage: 15 * waveScale, rate: 0.78, splash: 0, size: 15 };
 }
 
 function laneY(index: number, side: Side): number {
   const offsets = [-18, 0, 18, -9, 9];
-  const jitter = offsets[index % offsets.length];
-  return GROUND_Y + jitter + (side === 'player' ? 0 : 2);
+  return GROUND_Y + offsets[index % offsets.length] + (side === 'enemy' ? 2 : 0);
 }
 
 function summon(type: UnitType): void {
@@ -237,7 +230,6 @@ function summon(type: UnitType): void {
     });
   }
   showToast(`${meta.symbol} ${meta.name} ×${meta.squad} 出击`, 'good');
-  updateHud();
 }
 
 function spawnEnemy(kind: EnemyKind): void {
@@ -264,9 +256,9 @@ function chooseEnemyKind(wave: number): EnemyKind {
 }
 
 function spawnLogic(): void {
-  if (!battleStarted || gameOver) return;
   currentWave = Math.min(TOTAL_WAVES, Math.floor(gameTime / 18) + 1);
   const intervals = [2.25, 1.8, 1.5, 1.22, 1.0];
+
   if (gameTime >= nextSpawnAt) {
     spawnEnemy(chooseEnemyKind(currentWave));
     nextSpawnAt = gameTime + intervals[currentWave - 1];
@@ -280,11 +272,10 @@ function spawnLogic(): void {
 }
 
 function findTarget(unit: Fighter): Fighter | null {
-  const enemies = fighters.filter((candidate) => !candidate.dead && candidate.side !== unit.side);
-  if (enemies.length === 0) return null;
-
-  const directional = enemies.filter((candidate) => unit.side === 'player' ? candidate.x >= unit.x - 12 : candidate.x <= unit.x + 12);
-  const pool = directional.length > 0 ? directional : enemies;
+  const opponents = fighters.filter((candidate) => !candidate.dead && candidate.side !== unit.side);
+  if (opponents.length === 0) return null;
+  const directional = opponents.filter((candidate) => unit.side === 'player' ? candidate.x >= unit.x - 12 : candidate.x <= unit.x + 12);
+  const pool = directional.length > 0 ? directional : opponents;
   pool.sort((a, b) => Math.abs(a.x - unit.x) - Math.abs(b.x - unit.x));
   return pool[0] ?? null;
 }
@@ -296,8 +287,7 @@ function applyDamage(target: Fighter, damage: number, attacker: Fighter): void {
 
   target.dead = true;
   if (attacker.side === 'player') {
-    const reward = target.kind === 'boss' ? 120 : target.kind === 'tank' ? 18 : target.kind === 'runner' ? 10 : 12;
-    gold += reward;
+    gold += target.kind === 'boss' ? 120 : target.kind === 'tank' ? 18 : target.kind === 'runner' ? 10 : 12;
     ink = Math.min(MAX_INK, ink + (target.kind === 'boss' ? 18 : 4));
   }
 }
@@ -310,9 +300,7 @@ function attackFighter(attacker: Fighter, target: Fighter): void {
   if (attacker.side === 'player' && attacker.type === 'mage') {
     for (const candidate of fighters) {
       if (candidate.dead || candidate.side === attacker.side) continue;
-      if (Math.abs(candidate.x - target.x) <= attacker.splash) {
-        applyDamage(candidate, attacker.damage, attacker);
-      }
+      if (Math.abs(candidate.x - target.x) <= attacker.splash) applyDamage(candidate, attacker.damage, attacker);
     }
     effects.push({ kind: 'blast', from, to, radius: attacker.splash, life: 0.28, maxLife: 0.28, side: attacker.side });
     return;
@@ -333,11 +321,8 @@ function attackFighter(attacker: Fighter, target: Fighter): void {
 function attackBase(unit: Fighter): void {
   unit.cooldown = unit.rate;
   const attackingEnemy = unit.side === 'player';
-  if (attackingEnemy) {
-    enemyBaseHp = Math.max(0, enemyBaseHp - unit.damage);
-  } else {
-    playerBaseHp = Math.max(0, playerBaseHp - unit.damage);
-  }
+  if (attackingEnemy) enemyBaseHp = Math.max(0, enemyBaseHp - unit.damage);
+  else playerBaseHp = Math.max(0, playerBaseHp - unit.damage);
 
   effects.push({
     kind: 'base-hit',
@@ -365,17 +350,13 @@ function updateFighters(dt: number): void {
       continue;
     }
 
-    const baseDistance = unit.side === 'player'
-      ? ENEMY_BASE_X - unit.x
-      : unit.x - PLAYER_BASE_X;
-
+    const baseDistance = unit.side === 'player' ? ENEMY_BASE_X - unit.x : unit.x - PLAYER_BASE_X;
     if (baseDistance <= unit.range + 28) {
       if (unit.cooldown <= 0) attackBase(unit);
       continue;
     }
 
-    const direction = unit.side === 'player' ? 1 : -1;
-    unit.x += direction * unit.speed * dt;
+    unit.x += (unit.side === 'player' ? 1 : -1) * unit.speed * dt;
   }
 
   fighters = fighters.filter((fighter) => !fighter.dead && fighter.x > 10 && fighter.x < WIDTH - 10);
@@ -405,40 +386,12 @@ function endGame(win: boolean): void {
   });
 }
 
-function update(dt: number): void {
-  if (!gameOver) {
-    ink = Math.min(MAX_INK, ink + dt * 7.2);
-    if (battleStarted) {
-      gameTime += dt;
-      spawnLogic();
-      updateFighters(dt);
-    }
-  }
-
-  effects = effects
-    .map((effect) => ({ ...effect, life: effect.life - dt }))
-    .filter((effect) => effect.life > 0);
-
-  updateHud();
-}
-
-function updateHud(): void {
-  playerHpEl.textContent = `${Math.ceil(playerBaseHp)}`;
-  enemyHpEl.textContent = `${Math.ceil(enemyBaseHp)}`;
-  waveStat.textContent = `${currentWave} / ${TOTAL_WAVES}`;
-  inkStat.textContent = `${Math.floor(ink)} / ${MAX_INK}`;
-  goldStat.textContent = `${Math.floor(gold)}`;
-  renderUpgrades();
-}
-
 function upgradeCost(type: UnitType): number {
-  const level = levels[type];
-  return 70 + (level - 1) * 70;
+  return 70 + (levels[type] - 1) * 70;
 }
 
 function upgrade(type: UnitType): void {
-  const level = levels[type];
-  if (level >= 3) return;
+  if (levels[type] >= 3) return;
   const cost = upgradeCost(type);
   if (gold < cost) {
     showToast(`金币不足，还差 ${Math.ceil(cost - gold)}`, 'bad');
@@ -447,10 +400,14 @@ function upgrade(type: UnitType): void {
   gold -= cost;
   levels[type] += 1;
   showToast(`${UNIT_META[type].name} 升到 Lv.${levels[type]}`, 'good');
-  renderUpgrades();
+  upgradeRenderKey = '';
 }
 
-function renderUpgrades(): void {
+function renderUpgradesIfNeeded(): void {
+  const key = `${Math.floor(gold)}:${levels.warrior}:${levels.archer}:${levels.mage}`;
+  if (key === upgradeRenderKey) return;
+  upgradeRenderKey = key;
+
   const order: UnitType[] = ['warrior', 'archer', 'mage'];
   upgradePanel.innerHTML = order.map((type) => {
     const meta = UNIT_META[type];
@@ -470,10 +427,25 @@ function renderUpgrades(): void {
       </div>
     `;
   }).join('');
+}
 
-  upgradePanel.querySelectorAll<HTMLButtonElement>('[data-upgrade]').forEach((button) => {
-    button.addEventListener('click', () => upgrade(button.dataset.upgrade as UnitType));
-  });
+function update(dt: number): void {
+  if (!gameOver) {
+    ink = Math.min(MAX_INK, ink + dt * 7.2);
+    if (battleStarted) {
+      gameTime += dt;
+      spawnLogic();
+      updateFighters(dt);
+    }
+  }
+
+  effects = effects.map((effect) => ({ ...effect, life: effect.life - dt })).filter((effect) => effect.life > 0);
+  playerHpEl.textContent = `${Math.ceil(playerBaseHp)}`;
+  enemyHpEl.textContent = `${Math.ceil(enemyBaseHp)}`;
+  waveStat.textContent = `${currentWave} / ${TOTAL_WAVES}`;
+  inkStat.textContent = `${Math.floor(ink)} / ${MAX_INK}`;
+  goldStat.textContent = `${Math.floor(gold)}`;
+  renderUpgradesIfNeeded();
 }
 
 function drawBackground(): void {
@@ -486,9 +458,7 @@ function drawBackground(): void {
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
   ctx.fillStyle = 'rgba(255,255,255,.035)';
-  for (let x = 150; x < WIDTH; x += 170) {
-    ctx.fillRect(x, 75 + (x % 80), 2, 150);
-  }
+  for (let x = 150; x < WIDTH; x += 170) ctx.fillRect(x, 75 + (x % 80), 2, 150);
 
   ctx.fillStyle = '#5d5945';
   ctx.fillRect(0, GROUND_Y + 20, WIDTH, HEIGHT - GROUND_Y);
@@ -502,7 +472,6 @@ function drawBackground(): void {
   ctx.lineTo(WIDTH / 2, GROUND_Y + 15);
   ctx.stroke();
   ctx.setLineDash([]);
-
   ctx.font = '700 12px system-ui';
   ctx.textAlign = 'center';
   ctx.fillStyle = 'rgba(255,255,255,.32)';
@@ -515,7 +484,6 @@ function drawBase(side: Side): void {
   ctx.save();
   ctx.translate(x, GROUND_Y + 15);
   if (side === 'enemy') ctx.scale(-1, 1);
-
   ctx.fillStyle = side === 'player' ? '#688fb8' : '#aa5e5e';
   ctx.fillRect(-32, -92, 64, 92);
   ctx.fillStyle = '#222730';
@@ -578,7 +546,6 @@ function drawFighter(unit: Fighter): void {
   ctx.save();
   ctx.translate(unit.x, unit.y);
   if (unit.side === 'enemy') ctx.scale(-1, 1);
-
   drawShapeHead(unit);
   ctx.strokeStyle = unit.side === 'player' ? '#dfeeff' : '#ffe4e4';
   ctx.lineWidth = 3;
@@ -632,7 +599,6 @@ function drawEffects(): void {
     ctx.strokeStyle = effect.side === 'player' ? '#b9dcff' : '#ffb0b0';
     ctx.fillStyle = effect.side === 'player' ? 'rgba(162,207,255,.24)' : 'rgba(255,132,132,.22)';
     ctx.lineWidth = effect.kind === 'shot' ? 2 : 4;
-
     if (effect.kind === 'blast') {
       ctx.beginPath();
       ctx.arc(effect.to.x, effect.to.y, effect.radius * (1.1 - alpha * 0.2), 0, Math.PI * 2);
@@ -652,9 +618,7 @@ function render(): void {
   drawBackground();
   drawBase('player');
   drawBase('enemy');
-
-  const sorted = [...fighters].sort((a, b) => a.y - b.y);
-  for (const fighter of sorted) drawFighter(fighter);
+  for (const fighter of [...fighters].sort((a, b) => a.y - b.y)) drawFighter(fighter);
   drawEffects();
 
   if (!battleStarted && !gameOver) {
@@ -696,26 +660,27 @@ function resetGame(): void {
   levels.warrior = 1;
   levels.archer = 1;
   levels.mage = 1;
-  startBattle.disabled = false;
-  startBattle.textContent = '开始战斗';
+  upgradeRenderKey = '';
+  startBattleButton.disabled = false;
+  startBattleButton.textContent = '开始战斗';
   battleStatus.textContent = '准备阶段';
   recognitionText.textContent = '等待绘制';
   clearDrawing();
-  updateHud();
+  update(0);
 }
 
-startBattle.addEventListener('click', () => {
+startBattleButton.addEventListener('click', () => {
   if (battleStarted || gameOver) return;
   battleStarted = true;
   currentWave = 1;
   nextSpawnAt = 0;
-  startBattle.disabled = true;
-  startBattle.textContent = '战斗中';
+  startBattleButton.disabled = true;
+  startBattleButton.textContent = '战斗中';
   battleStatus.textContent = 'Wave 1';
   showToast('敌军从右侧出现，往前推！', 'good');
 });
 
-restartBattle.addEventListener('click', resetGame);
+restartBattleButton.addEventListener('click', resetGame);
 
 upgradePanel.addEventListener('click', (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-upgrade]');
@@ -738,6 +703,14 @@ function clearDrawing(): void {
   drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
   drawPoints = [];
   padHint.classList.remove('is-hidden');
+}
+
+function perpendicularDistance(point: Point, lineStart: Point, lineEnd: Point): number {
+  const dx = lineEnd.x - lineStart.x;
+  const dy = lineEnd.y - lineStart.y;
+  if (dx === 0 && dy === 0) return Math.hypot(point.x - lineStart.x, point.y - lineStart.y);
+  const t = ((point.x - lineStart.x) * dx + (point.y - lineStart.y) * dy) / (dx * dx + dy * dy);
+  return Math.hypot(point.x - (lineStart.x + t * dx), point.y - (lineStart.y + t * dy));
 }
 
 function simplify(points: Point[], epsilon: number): Point[] {
@@ -763,16 +736,6 @@ function simplify(points: Point[], epsilon: number): Point[] {
   return [first, last];
 }
 
-function perpendicularDistance(point: Point, lineStart: Point, lineEnd: Point): number {
-  const dx = lineEnd.x - lineStart.x;
-  const dy = lineEnd.y - lineStart.y;
-  if (dx === 0 && dy === 0) return Math.hypot(point.x - lineStart.x, point.y - lineStart.y);
-  const t = ((point.x - lineStart.x) * dx + (point.y - lineStart.y) * dy) / (dx * dx + dy * dy);
-  const projectedX = lineStart.x + t * dx;
-  const projectedY = lineStart.y + t * dy;
-  return Math.hypot(point.x - projectedX, point.y - projectedY);
-}
-
 function recognize(points: Point[]): UnitType | null {
   if (points.length < 12) return null;
   const xs = points.map((point) => point.x);
@@ -789,8 +752,8 @@ function recognize(points: Point[]): UnitType | null {
   const closure = Math.hypot(points[0].x - points[points.length - 1].x, points[0].y - points[points.length - 1].y);
   if (closure > diagonal * 0.42) return null;
 
-  const sampled = simplify(points, diagonal * 0.075);
-  const corners = Math.max(0, sampled.length - 1);
+  const simplified = simplify(points, diagonal * 0.075);
+  const corners = Math.max(0, simplified.length - 1);
   const center = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
   const radii = points.map((point) => Math.hypot(point.x - center.x, point.y - center.y));
   const meanRadius = radii.reduce((sum, value) => sum + value, 0) / radii.length;
@@ -804,6 +767,7 @@ function recognize(points: Point[]): UnitType | null {
 }
 
 function finishDrawing(): void {
+  if (!drawing) return;
   drawing = false;
   const result = recognize(drawPoints);
   if (!result) {
