@@ -314,15 +314,16 @@ function buildCells(level: LevelConfig, targetIndex: number): CatVariant[] {
 
 function renderStage(level: LevelConfig): void {
   if (!run) return;
+  const currentRun = run;
   app.innerHTML = `
     <main class="screen game-screen v2-game">
       <header class="run-header">
         <button class="icon-btn" data-action="quit" aria-label="退出本局">‹</button>
         <div class="run-progress-block">
-          <div class="run-progress-copy"><span>本局进度</span><strong>${run.index + 1} / ${RUN_LENGTH}</strong></div>
-          <div class="run-progress-dots">${Array.from({ length: RUN_LENGTH }, (_, i) => `<i class="${i < run.index ? 'done' : i === run.index ? 'active' : ''}"></i>`).join('')}</div>
+          <div class="run-progress-copy"><span>本局进度</span><strong>${currentRun.index + 1} / ${RUN_LENGTH}</strong></div>
+          <div class="run-progress-dots">${Array.from({ length: RUN_LENGTH }, (_, i) => `<i class="${i < currentRun.index ? 'done' : i === currentRun.index ? 'active' : ''}"></i>`).join('')}</div>
         </div>
-        <div class="run-food">🐟 <strong>${run.food}</strong></div>
+        <div class="run-food">🐟 <strong>${currentRun.food}</strong></div>
       </header>
 
       <section class="run-status-card">
@@ -332,9 +333,9 @@ function renderStage(level: LevelConfig): void {
         </div>
         <div class="streak-block">
           <span>连击</span>
-          <strong id="streakValue">🔥 ${run.streak}</strong>
+          <strong id="streakValue">🔥 ${currentRun.streak}</strong>
         </div>
-        <button class="hint-chip" data-action="hint" ${run.hintTokens <= 0 ? 'disabled' : ''}>💡 ${run.hintTokens}</button>
+        <button class="hint-chip" data-action="hint" ${currentRun.hintTokens <= 0 ? 'disabled' : ''}>💡 ${currentRun.hintTokens}</button>
       </section>
 
       <section class="prompt-card v2-prompt">
@@ -344,7 +345,7 @@ function renderStage(level: LevelConfig): void {
       </section>
 
       <section class="cat-grid v2-grid" id="catGrid" style="--cols:${level.cols}" aria-label="猫咪搜索区域">
-        ${run.cells.map((variant, index) => `
+        ${currentRun.cells.map((variant, index) => `
           <button class="cat-tile" data-index="${index}" aria-label="第 ${index + 1} 只猫">
             ${catSvg(variant)}
           </button>
@@ -362,7 +363,8 @@ function renderStage(level: LevelConfig): void {
 
 function renderMistakeSlots(): string {
   if (!run) return '';
-  return Array.from({ length: run.maxMistakes }, (_, index) => `<i class="${index < run.mistakes ? 'filled' : ''}">${index < run.mistakes ? '✕' : ''}</i>`).join('');
+  const currentRun = run;
+  return Array.from({ length: currentRun.maxMistakes }, (_, index) => `<i class="${index < currentRun.mistakes ? 'filled' : ''}">${index < currentRun.mistakes ? '✕' : ''}</i>`).join('');
 }
 
 function refreshRunHud(): void {
@@ -450,11 +452,12 @@ function useHint(): void {
 function renderUpgradeChoice(): void {
   if (!run) return;
   run.locked = true;
+  const currentRun = run;
   const choices = shuffleCopy(UPGRADES).slice(0, 3);
   app.innerHTML = `
     <main class="screen upgrade-screen">
       <section class="upgrade-intro">
-        <span class="card-kicker">完成 ${run.index} / ${RUN_LENGTH}</span>
+        <span class="card-kicker">完成 ${currentRun.index} / ${RUN_LENGTH}</span>
         <h1>选一个升级</h1>
         <p>这次选择只在本局生效。</p>
       </section>
@@ -468,9 +471,9 @@ function renderUpgradeChoice(): void {
         `).join('')}
       </section>
       <div class="upgrade-run-summary">
-        <span>当前失误 ${run.mistakes}/${run.maxMistakes}</span>
-        <span>🔥 ${run.streak} 连击</span>
-        <span>🐟 ${run.food}</span>
+        <span>当前失误 ${currentRun.mistakes}/${currentRun.maxMistakes}</span>
+        <span>🔥 ${currentRun.streak} 连击</span>
+        <span>🐟 ${currentRun.food}</span>
       </div>
     </main>
   `;
