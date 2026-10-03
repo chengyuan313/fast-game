@@ -13,5 +13,6 @@
     "strict": true,
     "noEmit": true
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/draw-defense/main.ts"]
 }
