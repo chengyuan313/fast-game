@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#0b1020" />
+  <meta name="description" content="Orbit Shift — a fast one-tap browser arcade game." />
+  <title>Orbit Shift</title>
+  <link rel="stylesheet" href="src/style.css" />
+</head>
+<body>
+  <main id="app" aria-label="Orbit Shift game">
+    <canvas id="game" aria-label="Game canvas"></canvas>
+
+    <section id="hud" class="hud hidden" aria-live="polite">
+      <div class="hud-pill"><span class="hud-label">SCORE</span><strong id="score">0</strong></div>
+      <div class="hud-pill combo"><span class="hud-label">COMBO</span><strong id="combo">x1</strong></div>
+      <div class="hud-pill"><span class="hud-label">COINS</span><strong id="runCoins">0</strong></div>
+    </section>
+
+    <section id="menu" class="panel visible">
+      <p class="eyebrow">ONE TAP. TWO LANES.</p>
+      <h1>ORBIT<br />SHIFT</h1>
+      <p class="subtitle">Tap to switch orbit. Dodge the arcs. Don't blink.</p>
+      <button id="playBtn" class="primary">PLAY</button>
+      <div class="stats-row">
+        <div><span>BEST</span><strong id="bestScore">0</strong></div>
+        <div><span>COINS</span><strong id="totalCoins">0</strong></div>
+      </div>
+      <button id="shopBtn" class="secondary">SKINS</button>
+      <p class="hint">Tap / click / Space to shift</p>
+    </section>
+
+    <section id="gameOver" class="panel compact hidden">
+      <p class="eyebrow">RUN OVER</p>
+      <h2 id="resultTitle">SO CLOSE</h2>
+      <div class="result-score"><span>SCORE</span><strong id="finalScore">0</strong></div>
+      <p id="newBest" class="new-best hidden">NEW BEST</p>
+      <div class="result-grid">
+        <div><span>BEST</span><strong id="finalBest">0</strong></div>
+        <div><span>COINS</span><strong id="finalCoins">+0</strong></div>
+      </div>
+      <button id="reviveBtn" class="reward">▶ REVIVE</button>
+      <button id="retryBtn" class="primary">RETRY</button>
+      <button id="homeBtn" class="secondary">HOME</button>
+    </section>
+
+    <section id="shop" class="panel compact hidden">
+      <p class="eyebrow">COSMETICS</p>
+      <h2>SKINS</h2>
+      <p class="shop-copy">Earn coins by surviving and landing perfect shifts.</p>
+      <div id="skinGrid" class="skin-grid"></div>
+      <button id="closeShopBtn" class="secondary">BACK</button>
+    </section>
+
+    <div id="toast" class="toast hidden" aria-live="polite"></div>
+  </main>
+
+  <script src="src/platform.js"></script>
+  <script src="src/game.js"></script>
+</body>
+</html>
