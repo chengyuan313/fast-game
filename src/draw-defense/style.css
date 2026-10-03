@@ -3,196 +3,204 @@
 :root {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #f7f3e8;
-  background: #0f1118;
+  background: #0d1016;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
 
-html, body { margin: 0; min-width: 320px; min-height: 100%; background: #0f1118; }
+html, body { margin: 0; min-width: 320px; min-height: 100%; background: #0d1016; }
 body { min-height: 100vh; }
 button, canvas { -webkit-tap-highlight-color: transparent; }
 button { font: inherit; }
 
 .dd-shell {
-  width: min(100%, 520px);
+  width: min(100%, 1180px);
   min-height: 100vh;
   margin: 0 auto;
-  padding: env(safe-area-inset-top) 14px calc(18px + env(safe-area-inset-bottom));
+  padding: calc(10px + env(safe-area-inset-top)) 14px calc(12px + env(safe-area-inset-bottom));
   background:
-    radial-gradient(circle at 50% -10%, rgba(240, 172, 82, .16), transparent 35%),
-    linear-gradient(180deg, #171923 0%, #0f1118 100%);
+    radial-gradient(circle at 18% 0%, rgba(91, 142, 190, .14), transparent 30%),
+    radial-gradient(circle at 82% 0%, rgba(181, 86, 86, .12), transparent 30%),
+    linear-gradient(180deg, #151922 0%, #0d1016 100%);
 }
 
 .dd-topbar {
-  display: grid;
-  grid-template-columns: 1fr auto;
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 12px;
-  padding: 14px 2px 10px;
+  gap: 16px;
+  min-height: 54px;
+  padding: 2px 2px 8px;
 }
 
-.dd-title-wrap h1 { margin: 0; font-size: 24px; letter-spacing: -.5px; }
-.dd-title-wrap p { margin: 4px 0 0; color: #aeb4c3; font-size: 12px; }
-.dd-back { color: #c9ced9; text-decoration: none; font-size: 13px; }
+.dd-eyebrow { margin: 0 0 2px; color: #7f8a9d; font-size: 10px; font-weight: 800; letter-spacing: 1.3px; }
+.dd-topbar h1 { margin: 0; font-size: 24px; letter-spacing: -.6px; }
+.dd-header-actions { display: flex; align-items: center; gap: 8px; }
+.dd-header-actions > span { min-width: 90px; color: #b5bdca; font-size: 12px; text-align: right; }
 
-.dd-stats {
+.dd-btn {
+  border: 1px solid #343a49;
+  border-radius: 11px;
+  padding: 9px 13px;
+  background: #242a36;
+  color: #f6f2e9;
+  font-weight: 800;
+  font-size: 12px;
+  cursor: pointer;
+}
+.dd-btn:hover:not(:disabled) { filter: brightness(1.08); }
+.dd-btn:disabled { opacity: .38; cursor: default; }
+.dd-btn-primary { border-color: #e2a254; background: #e8a454; color: #1c1711; }
+
+.dd-hud {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: minmax(140px, .9fr) minmax(320px, 1.8fr) minmax(140px, .9fr);
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
-.dd-stat {
-  border: 1px solid #2a2e3b;
-  background: #191c26;
-  border-radius: 14px;
-  padding: 8px 10px;
-  text-align: center;
+.dd-hud-side,
+.dd-hud-center {
+  min-height: 48px;
+  border: 1px solid #292f3c;
+  border-radius: 13px;
+  background: #171b24;
 }
-.dd-stat span { display: block; color: #8e96a8; font-size: 10px; text-transform: uppercase; letter-spacing: .8px; }
-.dd-stat strong { display: block; margin-top: 3px; font-size: 17px; }
+
+.dd-hud-side { display: flex; align-items: center; justify-content: space-between; padding: 8px 13px; }
+.dd-hud-side span { color: #8993a5; font-size: 10px; font-weight: 700; }
+.dd-hud-side strong { font-size: 20px; }
+.dd-hud-side.player strong { color: #8fc9f1; }
+.dd-hud-side.enemy { flex-direction: row-reverse; }
+.dd-hud-side.enemy strong { color: #ef9595; }
+
+.dd-hud-center { display: grid; grid-template-columns: repeat(3, 1fr); }
+.dd-hud-center > div { display: grid; place-items: center; align-content: center; border-right: 1px solid #292f3c; }
+.dd-hud-center > div:last-child { border-right: 0; }
+.dd-hud-center span { color: #7f899b; font-size: 9px; text-transform: uppercase; letter-spacing: .9px; }
+.dd-hud-center strong { margin-top: 2px; font-size: 16px; }
 
 .dd-battle-card {
   position: relative;
-  border: 1px solid #303545;
-  border-radius: 20px;
   overflow: hidden;
-  background: #222a2d;
-  box-shadow: 0 14px 40px rgba(0,0,0,.28);
+  border: 1px solid #323947;
+  border-radius: 18px;
+  background: #28343a;
+  box-shadow: 0 16px 46px rgba(0,0,0,.28);
 }
 
-#battlefield { display: block; width: 100%; height: auto; touch-action: manipulation; background: #273333; }
+#battlefield {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: calc(100vh - 305px);
+  object-fit: contain;
+  background: #273238;
+}
 
 .dd-toast {
   position: absolute;
-  left: 50%; top: 14px;
-  transform: translateX(-50%) translateY(-8px);
-  min-width: 180px;
-  max-width: 85%;
-  padding: 9px 12px;
+  left: 50%; top: 12px;
+  z-index: 3;
+  transform: translateX(-50%) translateY(-7px);
+  min-width: 190px;
+  max-width: 72%;
+  padding: 8px 13px;
+  border: 1px solid rgba(255,255,255,.13);
   border-radius: 999px;
+  background: rgba(12, 15, 20, .9);
   text-align: center;
   font-size: 12px;
-  font-weight: 700;
-  background: rgba(17, 20, 28, .9);
-  border: 1px solid rgba(255,255,255,.12);
+  font-weight: 800;
   opacity: 0;
   pointer-events: none;
-  transition: .18s ease;
+  transition: .16s ease;
 }
 .dd-toast.is-show { opacity: 1; transform: translateX(-50%) translateY(0); }
-.dd-toast.good { border-color: rgba(119, 226, 149, .45); }
-.dd-toast.bad { border-color: rgba(255, 116, 116, .45); }
+.dd-toast.good { border-color: rgba(126, 202, 241, .52); }
+.dd-toast.bad { border-color: rgba(239, 137, 137, .55); }
 
-.dd-controls { margin-top: 10px; display: grid; gap: 10px; }
+.dd-rotate-note { display: none; }
 
-.dd-wave-row {
+.dd-bottom-grid {
   display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
+  grid-template-columns: minmax(420px, 1.05fr) minmax(420px, .95fr);
+  gap: 9px;
+  margin-top: 9px;
 }
 
-.dd-status {
-  min-height: 48px;
-  display: flex;
-  align-items: center;
-  padding: 10px 12px;
-  border: 1px solid #2b3040;
-  border-radius: 14px;
-  background: #171a23;
-  color: #cbd0dc;
-  font-size: 12px;
-  line-height: 1.35;
+.dd-draw-card,
+.dd-army-card {
+  min-width: 0;
+  border: 1px solid #2b3140;
+  border-radius: 16px;
+  background: #161a23;
+  padding: 10px;
 }
 
-.dd-btn {
-  border: 0;
-  border-radius: 14px;
-  padding: 11px 15px;
-  font-weight: 800;
-  cursor: pointer;
-  background: #292e3c;
-  color: #f8f3e8;
-}
-.dd-btn:disabled { opacity: .42; cursor: default; }
-.dd-btn-primary { background: #ef9d48; color: #1b1711; min-width: 116px; }
-.dd-btn-danger { background: #5a2630; }
+.dd-section-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; min-height: 33px; }
+.dd-section-head strong { display: block; font-size: 13px; }
+.dd-section-head p { margin: 2px 0 0; color: #838d9f; font-size: 10px; }
+.dd-recognition { color: #e8b86d; font-size: 12px; font-weight: 800; text-align: right; }
 
-.dd-draw-card {
-  border: 1px solid #2b3040;
-  border-radius: 18px;
-  padding: 12px;
-  background: #171a23;
-}
-
-.dd-draw-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 8px; }
-.dd-draw-head strong { font-size: 14px; }
-.dd-draw-head p { margin: 3px 0 0; color: #929aab; font-size: 11px; }
-.dd-recognition { min-width: 98px; text-align: right; font-size: 12px; color: #f0b96d; font-weight: 800; }
-
-.dd-pad-wrap { position: relative; }
+.dd-pad-wrap { position: relative; margin-top: 7px; }
 #drawPad {
   display: block;
   width: 100%;
-  height: 130px;
-  border-radius: 14px;
-  background: #0f1219;
-  border: 1px dashed #414859;
+  height: 104px;
+  border: 1px dashed #465064;
+  border-radius: 12px;
+  background: #0d1118;
   touch-action: none;
 }
 .dd-pad-hint {
   position: absolute;
   inset: 0;
   display: flex;
-  justify-content: center;
   align-items: center;
-  gap: 24px;
-  pointer-events: none;
-  color: #333a49;
-  font-size: 42px;
+  justify-content: center;
+  gap: 34px;
+  color: #323b4b;
+  font-size: 44px;
   font-weight: 800;
-  opacity: .7;
+  pointer-events: none;
+  transition: opacity .12s ease;
 }
 .dd-pad-hint.is-hidden { opacity: 0; }
+.dd-resource-note { margin-top: 6px; color: #747f90; font-size: 9px; text-align: center; }
 
-.dd-legend {
+.dd-upgrades { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin-top: 7px; }
+.dd-upgrade-item {
+  min-width: 0;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 7px;
-  margin-top: 9px;
-}
-.dd-class {
-  padding: 9px 7px;
+  grid-template-columns: 34px 1fr;
+  grid-template-areas: "symbol copy" "button button";
+  gap: 6px 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid #29303e;
   border-radius: 12px;
-  background: #11141c;
-  border: 1px solid #292e3a;
-  text-align: center;
+  background: #10141b;
 }
-.dd-class strong { display: block; font-size: 12px; }
-.dd-class span { display: block; margin-top: 3px; font-size: 10px; color: #8f97a9; }
-
-.dd-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 9px; }
-
-.dd-unit-panel {
-  display: none;
-  margin-top: 10px;
-  border: 1px solid #384055;
-  border-radius: 16px;
-  padding: 11px 12px;
-  background: #1c202b;
+.dd-unit-symbol {
+  grid-area: symbol;
+  width: 34px; height: 34px;
+  display: grid; place-items: center;
+  border-radius: 9px;
+  background: #202937;
+  font-size: 22px;
+  font-weight: 900;
 }
-.dd-unit-panel.is-show { display: block; }
-.dd-unit-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
-.dd-unit-copy strong { display: block; font-size: 14px; }
-.dd-unit-copy span { display: block; margin-top: 3px; color: #99a1b1; font-size: 11px; }
+.dd-unit-symbol.warrior { color: #d9e6f4; }
+.dd-unit-symbol.archer { color: #e9d79a; }
+.dd-unit-symbol.mage { color: #d8b2ff; }
+.dd-upgrade-copy { grid-area: copy; min-width: 0; }
+.dd-upgrade-copy strong { display: block; font-size: 11px; white-space: nowrap; }
+.dd-upgrade-copy em { color: #85b9e5; font-style: normal; }
+.dd-upgrade-copy span { display: block; margin-top: 2px; overflow: hidden; color: #758092; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.dd-upgrade-btn { grid-area: button; width: 100%; padding: 7px 8px; font-size: 10px; }
 
-.dd-help {
-  margin: 10px 4px 0;
-  color: #818999;
-  font-size: 10px;
-  line-height: 1.5;
-  text-align: center;
-}
+.dd-help { margin: 7px 4px 0; color: #697484; font-size: 9px; text-align: center; }
 
 .dd-modal {
   position: fixed;
@@ -201,24 +209,58 @@ button { font: inherit; }
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(8, 10, 14, .72);
+  background: rgba(7, 9, 13, .75);
   backdrop-filter: blur(5px);
 }
 .dd-modal-card {
   width: min(100%, 360px);
   padding: 24px 20px;
-  border-radius: 22px;
-  background: #1b1f29;
-  border: 1px solid #343a49;
+  border: 1px solid #343b4b;
+  border-radius: 21px;
+  background: #1a1f29;
   text-align: center;
   box-shadow: 0 20px 70px rgba(0,0,0,.45);
 }
 .dd-modal-card .big { font-size: 42px; }
-.dd-modal-card h2 { margin: 8px 0 6px; font-size: 24px; }
-.dd-modal-card p { margin: 0 0 16px; color: #aab1c0; font-size: 12px; line-height: 1.5; }
+.dd-modal-card h2 { margin: 7px 0 5px; font-size: 24px; }
+.dd-modal-card p { margin: 0 0 15px; color: #a2abb9; font-size: 11px; line-height: 1.5; }
 .dd-modal-card .dd-btn { width: 100%; }
 
-@media (min-width: 700px) {
-  .dd-shell { padding-top: 18px; }
-  .dd-title-wrap h1 { font-size: 28px; }
+@media (max-width: 900px) and (orientation: landscape) {
+  .dd-shell { width: 100%; padding: 6px 8px; }
+  .dd-topbar { min-height: 42px; }
+  .dd-eyebrow { display: none; }
+  .dd-topbar h1 { font-size: 18px; }
+  .dd-header-actions > span { display: none; }
+  .dd-btn { padding: 7px 10px; font-size: 10px; }
+  .dd-hud { margin-bottom: 5px; }
+  .dd-hud-side, .dd-hud-center { min-height: 38px; }
+  .dd-hud-side strong { font-size: 16px; }
+  #battlefield { max-height: 52vh; }
+  .dd-bottom-grid { grid-template-columns: 1.05fr .95fr; gap: 5px; margin-top: 5px; }
+  .dd-draw-card, .dd-army-card { padding: 7px; border-radius: 12px; }
+  .dd-section-head { min-height: 25px; }
+  .dd-section-head p, .dd-resource-note, .dd-help { display: none; }
+  #drawPad { height: 76px; }
+  .dd-pad-hint { font-size: 34px; }
+  .dd-upgrade-item { padding: 5px; gap: 4px; }
+  .dd-unit-symbol { width: 28px; height: 28px; font-size: 17px; }
+  .dd-upgrade-copy span { display: none; }
+}
+
+@media (orientation: portrait) and (max-width: 760px) {
+  .dd-shell { width: 920px; transform-origin: top left; }
+  body { overflow-x: auto; }
+  .dd-rotate-note {
+    display: block;
+    position: absolute;
+    right: 12px;
+    bottom: 10px;
+    z-index: 4;
+    padding: 6px 9px;
+    border-radius: 999px;
+    background: rgba(10,12,16,.78);
+    color: #d7dce5;
+    font-size: 10px;
+  }
 }
