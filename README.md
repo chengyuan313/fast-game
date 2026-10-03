@@ -1,23 +1,40 @@
-# Orbit Shift
+# 找出那只猫 / Find That Cat
 
-A fast, one-tap HTML5 arcade game designed for short sessions, instant restarts, and browser-first distribution.
+中国区轻量 IAA 小游戏实验项目。
 
-## Status
+## 当前目标
 
-MVP development in progress.
+先做一个可在浏览器直接试玩的 MVP，再适配微信小游戏。
 
-## Core idea
+核心玩法：玩家在一群高度相似的猫中，限时找出唯一不同的目标猫。
 
-- The player automatically orbits around the center.
-- Tap/click/Space toggles between an inner and outer lane.
-- Avoid arc obstacles and survive as long as possible.
-- Speed and pattern difficulty increase over time.
-- Score, combo, coins, skins, and one optional revive create replayability.
+## MVP 范围
 
-## Development principles
+- 30 个关卡
+- 手机竖屏优先
+- 正确点击过关
+- 错误点击扣时
+- 超时后可重新挑战
+- 提示 / 加时 / 继续通过广告接口抽象实现
+- 浏览器阶段使用 Mock Ad，不接真实广告
+- 关卡数据驱动，可批量扩展
 
-- Browser first: HTML/CSS/JavaScript + Canvas 2D.
-- No build step required for the MVP.
-- Mobile portrait first, desktop compatible.
-- No external art assets required.
-- Platform ad integrations stay behind an adapter so the same game can target multiple portals.
+## 技术路线
+
+- TypeScript
+- Vite
+- HTML/CSS + DOM/Canvas（按实际复杂度选择）
+- JSON/TS 数据化关卡
+- `AdService` 平台适配层
+
+## 开发原则
+
+1. 3 秒内让玩家理解玩法。
+2. 第一版只验证“继续玩 / 看广告 / 分享”三个行为。
+3. 不做养成、商城、剧情、PvP、公会等非核心系统。
+4. `main` 保持稳定；功能开发走分支 + PR。
+5. 浏览器 MVP 通过后，再做微信小游戏适配。
+
+## 当前开发分支
+
+`feat/find-that-cat-mvp`
