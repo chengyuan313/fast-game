@@ -3,8 +3,9 @@ import { adService } from './services/adService';
 import { catSvg } from './game/catSvg';
 import { getLevel, levels, type CatVariant, type LevelConfig } from './game/levels';
 
-const app = document.querySelector<HTMLDivElement>('#app');
-if (!app) throw new Error('Missing #app root');
+const appNode = document.querySelector<HTMLDivElement>('#app');
+if (!appNode) throw new Error('Missing #app root');
+const app: HTMLDivElement = appNode;
 
 const STORAGE_KEY = 'find-that-cat:progress:v1';
 const TOTAL_LEVELS = levels.length;
@@ -221,12 +222,13 @@ function onGridClick(event: Event): void {
 
 function handleSuccess(button: HTMLButtonElement): void {
   if (!round) return;
-  round.finished = true;
+  const finishedRound = round;
+  finishedRound.finished = true;
   stopTimer();
   button.classList.add('is-correct');
 
-  const elapsedMs = Math.round(performance.now() - round.startedAt);
-  const completedLevel = round.level.id;
+  const elapsedMs = Math.round(performance.now() - finishedRound.startedAt);
+  const completedLevel = finishedRound.level.id;
   progress.totalWins += 1;
 
   if (completedLevel < TOTAL_LEVELS) {
@@ -238,9 +240,10 @@ function handleSuccess(button: HTMLButtonElement): void {
   saveProgress();
 
   showFeedback('找到啦！', 'good');
-  track('level_complete', { level: completedLevel, elapsed_ms: elapsedMs, remaining_ms: Math.round(round.remainingMs) });
+  track('level_complete', { level: completedLevel, elapsed_ms: elapsedMs, remaining_ms: Math.round(finishedRound.remainingMs) });
 
   window.setTimeout(() => {
+    if (round !== finishedRound) return;
     if (completedLevel >= TOTAL_LEVELS) {
       renderVictory();
     } else {
@@ -278,10 +281,9 @@ function startTimer(): void {
 }
 
 function stopTimer(): void {
-  if (round?.timerId !== null && round?.timerId !== undefined) {
-    window.clearInterval(round.timerId);
-    round.timerId = null;
-  }
+  if (!round || round.timerId === null) return;
+  window.clearInterval(round.timerId);
+  round.timerId = null;
 }
 
 function tick(): void {
